@@ -1,4 +1,4 @@
-// [修正] リザルトシートの勝敗入力UIを左右配置に変更し省スペース化 (v.1.5.4)
+// [修正] リザルトシート左側の勝敗ボタンの背景ハイライトを削除 (v.1.5.5)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -488,7 +488,6 @@ class _GameRow extends StatelessWidget {
           // 3. Body (Left: Buttons+Throw, Center: Players, Right: Result Display)
           IntrinsicHeight(
             child: Container(
-              // シングルスでもボタンが押しやすい高さを確保
               constraints: const BoxConstraints(minHeight: 88),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -632,7 +631,7 @@ class _SideResultButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? color.withValues(alpha: 0.15) : Colors.transparent,
+      color: Colors.transparent, // 背景のハイライトを削除
       child: InkWell(
         onTap: onTap,
         child: Center(
