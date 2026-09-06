@@ -63,6 +63,8 @@ async function updatePlayers(db, memberRecords) {
       stats01: record.stats01,
       statsCricket: record.statsCricket,
       winRate: record.winRate,
+      wins: record.wins,
+      losses: record.losses,
       isProvisional: false,
     });
     updated.push(record.kanjiName);

@@ -157,9 +157,6 @@ class _StatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final games = player.winLossByGame.values;
-    final wins = games.fold<int>(0, (sum, g) => sum + g.wins);
-    final losses = games.fold<int>(0, (sum, g) => sum + g.losses);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -179,7 +176,7 @@ class _StatsCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('通算: $wins勝 $losses敗'),
+                Text('通算: ${player.wins}勝 ${player.losses}敗'),
                 Text('勝率: ${(player.winRate * 100).toStringAsFixed(1)}%'),
               ],
             ),

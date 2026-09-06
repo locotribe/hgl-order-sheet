@@ -34,6 +34,8 @@ class Player {
     this.isProvisional = false,
     this.winLossByGame = const {},
     this.winRate = 0,
+    this.wins = 0,
+    this.losses = 0,
     this.isAdmin = false,
   });
 
@@ -49,9 +51,13 @@ class Player {
   final double? manualRating;
   final bool isProvisional;
 
-  /// ゲーム番号(1-11)ごとの勝敗。
+  /// ゲーム番号(1-11)ごとの勝敗（このチームのオーダーシート内での成績）。
   final Map<int, PlayerGameRecord> winLossByGame;
+
+  /// リーグ公式の通算勝敗・勝率（スクレイパーが取得する実データ）。
   final double winRate;
+  final int wins;
+  final int losses;
   final bool isAdmin;
 
   /// 01系・クリケット系それぞれの強さ算出に使う実効値。
@@ -78,6 +84,8 @@ class Player {
         ),
       ),
       winRate: (map['winRate'] as num?)?.toDouble() ?? 0,
+      wins: (map['wins'] as num?)?.toInt() ?? 0,
+      losses: (map['losses'] as num?)?.toInt() ?? 0,
       isAdmin: map['isAdmin'] as bool? ?? false,
     );
   }
@@ -95,6 +103,8 @@ class Player {
         (key, value) => MapEntry(key.toString(), value.toMap()),
       ),
       'winRate': winRate,
+      'wins': wins,
+      'losses': losses,
       'isAdmin': isAdmin,
     };
   }
@@ -108,6 +118,8 @@ class Player {
     bool? isProvisional,
     Map<int, PlayerGameRecord>? winLossByGame,
     double? winRate,
+    int? wins,
+    int? losses,
     bool? isAdmin,
   }) {
     return Player(
@@ -121,6 +133,8 @@ class Player {
       isProvisional: isProvisional ?? this.isProvisional,
       winLossByGame: winLossByGame ?? this.winLossByGame,
       winRate: winRate ?? this.winRate,
+      wins: wins ?? this.wins,
+      losses: losses ?? this.losses,
       isAdmin: isAdmin ?? this.isAdmin,
     );
   }
