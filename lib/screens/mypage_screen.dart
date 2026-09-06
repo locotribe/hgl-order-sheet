@@ -1,7 +1,9 @@
-// [修正] 管理者メニューボタンを廃止し、タイトル5回タップの隠し扉に変更 (v.1.6)
+// [追加] 外部URL起動のためのパッケージ (v.1.7)
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/attendance.dart';
 import '../models/player.dart';
@@ -29,7 +31,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
   final _attendanceRepository = AttendanceRepository();
   final _gameRepository = GameRepository();
 
-  // 隠し扉用のステート変数
   int _adminTapCount = 0;
   Timer? _adminTapTimer;
 
@@ -39,7 +40,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
     super.dispose();
   }
 
-  // タイトルタップ時の処理
   void _handleAdminTap() {
     _adminTapTimer?.cancel();
     _adminTapCount++;
@@ -50,10 +50,32 @@ class _MyPageScreenState extends State<MyPageScreen> {
         MaterialPageRoute(builder: (_) => const AdminGateScreen()),
       );
     } else {
-      // 1秒間次のタップがなければカウントをリセット
       _adminTapTimer = Timer(const Duration(seconds: 1), () {
         _adminTapCount = 0;
       });
+    }
+  }
+
+  // [追加] URLスキームとウェブ起動処理 (v.1.7)
+  Future<void> _launchWeb(String urlString) async {
+    final url = Uri.parse(urlString);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _launchAppOrStore() async {
+    final appUrl = Uri.parse('dlsports://');
+    if (await canLaunchUrl(appUrl)) {
+      // インストール済みの場合はアプリを直接起動
+      await launchUrl(appUrl, mode: LaunchMode.externalApplication);
+    } else {
+      // 未インストールの場合は各OSのストアへ誘導
+      if (Platform.isAndroid) {
+        await _launchWeb('https://play.google.com/store/apps/details?id=com.dartslive.dlsports');
+      } else if (Platform.isIOS) {
+        await _launchWeb('https://apps.apple.com/jp/app/dartslive-sports/id1400105618');
+      }
     }
   }
 
@@ -185,7 +207,64 @@ class _MyPageScreenState extends State<MyPageScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           MatchInfoCard(week: week),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
+
+                          // [追加] 公式ページとアプリ起動リンク (v.1.7)
+                          InkWell(
+                            onTap: () => _launchWeb('https://dartshive.com/league/'),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'ハイブグローバルリーグ公式ページ',
+                                style: TextStyle(
+                                  color: Colors.blue,
+                                  decoration: TextDecoration.underline,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: _launchAppOrStore,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Image.asset(
+                                      'assets/image_f6d8df.png',
+                                      width: 24,
+                                      height: 24,
+                                      // 万が一画像が読み込めない場合のフォールバック
+                                      errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(Icons.sports_esports, size: 24),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'DARTSLIVE SPORTS アプリを開く',
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            '※詳しいリーグデータは専用アプリからご確認いただけます',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+
                           Row(
                             children: [
                               Expanded(

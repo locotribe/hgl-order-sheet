@@ -43,6 +43,11 @@
 					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
 					<key>UISceneStoryboardFile</key>
 					<string>Main</string>
+					<key>LSApplicationQueriesSchemes</key>
+                    <array>
+                        <string>dlsports</string>
+                        <string>https</string>
+                    </array>
 				</dict>
 			</array>
 		</dict>
