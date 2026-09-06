@@ -237,6 +237,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                             ),
                           ),
                           const SizedBox(height: 4),
+                          // [修正] ダーツライブスポーツアプリのリンクを大きなアイコンのみに変更 (v.1.8.1)
                           InkWell(
                             onTap: _launchAppOrStore,
                             child: Padding(
@@ -245,22 +246,13 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(10),
                                     child: Image.asset(
                                       'assets/image_f6d8df.png',
-                                      width: 24,
-                                      height: 24,
+                                      width: 48,
+                                      height: 48,
                                       errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.sports_esports, size: 24),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'DARTSLIVE SPORTS アプリを開く',
-                                    style: TextStyle(
-                                      color: Colors.blue,
-                                      decoration: TextDecoration.underline,
-                                      fontWeight: FontWeight.bold,
+                                      const Icon(Icons.sports_esports, size: 48),
                                     ),
                                   ),
                                 ],
@@ -269,7 +261,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            '※詳しいリーグデータは専用アプリからご確認いただけます',
+                            '※詳しいデータは専用アプリから確認してください。',
                             style: TextStyle(fontSize: 12, color: Colors.grey),
                             textAlign: TextAlign.center,
                           ),
@@ -383,7 +375,7 @@ class _ProfileCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text('公式レーティング : ${player.rating.toStringAsFixed(2)}'),
+                  Text('リーグレーティング : ${player.rating.toStringAsFixed(2)}'),
                   if (player.isProvisional)
                     const Text(
                       '※手入力の仮レーティング適用中',
