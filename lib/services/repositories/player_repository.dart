@@ -4,20 +4,20 @@ import '../../models/player.dart';
 
 class PlayerRepository {
   PlayerRepository({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
   CollectionReference<Player> get _collection => _firestore
       .collection('players')
       .withConverter<Player>(
-        fromFirestore: (snap, _) => Player.fromMap(snap.id, snap.data()!),
-        toFirestore: (player, _) => player.toMap(),
-      );
+    fromFirestore: (snap, _) => Player.fromMap(snap.id, snap.data()!),
+    toFirestore: (player, _) => player.toMap(),
+  );
 
   Stream<List<Player>> watchAll() {
     return _collection.snapshots().map(
-      (snap) => snap.docs.map((d) => d.data()).toList(),
+          (snap) => snap.docs.map((d) => d.data()).toList(),
     );
   }
 

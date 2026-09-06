@@ -53,7 +53,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ...presentPlayers.map(
             (p) => AssignmentEntrant(
           id: p.id,
-          name: p.kanjiName,
+          name: p.effectiveName,
           stats01: p.effectiveStats01,
           statsCricket: p.effectiveStatsCricket,
         ),

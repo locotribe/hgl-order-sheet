@@ -191,7 +191,7 @@ class _AdminScreenState extends State<AdminScreen> {
                             children: [
                               for (final p in players)
                                 SwitchListTile(
-                                  title: Text(p.kanjiName),
+                                  title: Text(p.effectiveName),
                                   subtitle: Text(
                                     presentIds.contains(p.id) ? '参加' : '未参加',
                                     style: TextStyle(color: presentIds.contains(p.id) ? Colors.green : Colors.grey),

@@ -2,7 +2,7 @@
 name: hgl_order_sheet
 description: "HGLオーダーシート — LOCO TRIBE用ダーツリーグ・オーダーシート管理アプリ（LIFF + Flutter Web + Firebase）"
 publish_to: 'none'
-version: 1.4.0+11
+version: 1.5.0+12
 
 environment:
   sdk: ^3.12.2

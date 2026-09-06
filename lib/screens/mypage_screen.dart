@@ -1,4 +1,4 @@
-// [修正] トグル式出欠ボタンとオーダーシート表記の変更 (v.1.2)
+// [修正] アバター削除と表示名（displayName）の随時変更機能の実装 (v.1.4)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -26,6 +26,64 @@ class _MyPageScreenState extends State<MyPageScreen> {
   final _playerRepository = PlayerRepository();
   final _attendanceRepository = AttendanceRepository();
 
+  Future<void> _editDisplayName(Player player) async {
+    final controller = TextEditingController(text: player.effectiveName);
+    final formKey = GlobalKey<FormState>();
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('表示名の変更'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: controller,
+                decoration: const InputDecoration(labelText: '表示名'),
+                validator: (v) =>
+                (v == null || v.trim().isEmpty) ? '名前を入力してください' : null,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '※表示される名前だけが変わります（成績の紐付けには影響しません）',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.of(context).pop(controller.text.trim());
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+
+    if (newName == null || newName == player.effectiveName) return;
+
+    final updatedPlayer = player.copyWith(
+      displayName: newName,
+    );
+
+    await _playerRepository.update(updatedPlayer);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('表示名を変更しました')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
@@ -41,7 +99,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _ProfileCard(player: player),
+              _ProfileCard(
+                player: player,
+                onEditName: () => _editDisplayName(player),
+              ),
               const SizedBox(height: 16),
               _StatsCard(player: player),
               const SizedBox(height: 16),
@@ -77,12 +138,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
                     );
                   }
 
-                  // 自分自身の出欠状況をリアルタイム購読
                   return StreamBuilder<List<Attendance>>(
                     stream: _attendanceRepository.watchAll(week.id),
                     builder: (context, attSnap) {
                       final attendanceList = attSnap.data ?? [];
-                      // 自分の参加状態を取得
                       final myAttendance = attendanceList.where((a) => a.playerId == myId).firstOrNull;
                       final isPresent = myAttendance?.present ?? false;
 
@@ -96,7 +155,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
                               Expanded(
                                 child: ElevatedButton.icon(
                                   onPressed: () async {
-                                    // トグル処理（参加↔不参加を切り替え）
                                     final newState = !isPresent;
                                     await _attendanceRepository.setPresent(
                                       weekId: week.id,
@@ -110,7 +168,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    // 参加中なら赤、未参加なら白（標準）
                                     backgroundColor: isPresent ? Colors.red.shade600 : null,
                                     foregroundColor: isPresent ? Colors.white : null,
                                   ),
@@ -168,8 +225,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.player});
+  const _ProfileCard({required this.player, required this.onEditName});
   final Player player;
+  final VoidCallback onEditName;
 
   @override
   Widget build(BuildContext context) {
@@ -178,24 +236,27 @@ class _ProfileCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 28,
-              child: Text(
-                player.kanjiName.isNotEmpty ? player.kanjiName[0] : '?',
-                style: const TextStyle(fontSize: 20),
-              ),
-            ),
-            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    player.kanjiName,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          player.effectiveName,
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 20),
+                        tooltip: '表示名を変更',
+                        onPressed: onEditName,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
-                  Text('公式レート : ${player.rating.toStringAsFixed(2)}'),
+                  Text('公式レーティング : ${player.rating.toStringAsFixed(2)}'),
                   if (player.isProvisional)
                     const Text(
                       '※手入力の仮レート適用中',

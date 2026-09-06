@@ -1,4 +1,4 @@
-// [修正] リザルトシートのUI刷新（フラットなリスト型・大型ボタン化） (v.1.3)
+// [修正] リザルトシート上部に出場回数・合計試合数のサマリー一覧を追加 (v.1.4)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -194,7 +194,7 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                             .map(
                               (p) => RosterEntrant(
                             id: p.id,
-                            name: p.kanjiName,
+                            name: p.effectiveName,
                             isGuest: false,
                           ),
                         ),
@@ -230,6 +230,9 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                               .where((g) => g.result == GameResult.loss)
                               .length;
 
+                          // 出場回数サマリーの計算
+                          final counts = RosterCounts.compute(games);
+
                           return Column(
                             children: [
                               Container(
@@ -246,6 +249,126 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                                   textAlign: TextAlign.center,
                                 ),
                               ),
+                              // 参加者の出場回数一覧サマリーカード
+                              if (roster.isNotEmpty)
+                                Card(
+                                  margin: const EdgeInsets.all(8),
+                                  child: ExpansionTile(
+                                    title: const Text(
+                                      '📊 出場回数サマリー（タップで展開）',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 8,
+                                        ),
+                                        child: Column(
+                                          children: [
+                                            for (final entrant in roster)
+                                              Builder(
+                                                builder: (context) {
+                                                  final sCount = counts.countFor(
+                                                    GameFormat.singles,
+                                                    entrant.id,
+                                                  );
+                                                  final dCount = counts.countFor(
+                                                    GameFormat.doubles,
+                                                    entrant.id,
+                                                  );
+                                                  final tCount = counts.countFor(
+                                                    GameFormat.trios,
+                                                    entrant.id,
+                                                  );
+                                                  final totalCount =
+                                                      sCount + dCount + tCount;
+
+                                                  const maxS = 1;
+                                                  const maxD = 4;
+                                                  const maxT = 3;
+
+                                                  return Padding(
+                                                    padding:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 4,
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                      children: [
+                                                        Expanded(
+                                                          flex: 3,
+                                                          child: Text(
+                                                            entrant.isGuest
+                                                                ? '${entrant.name} (G)'
+                                                                : entrant.name,
+                                                            style: TextStyle(
+                                                              fontWeight:
+                                                              FontWeight
+                                                                  .bold,
+                                                              color: entrant
+                                                                  .isGuest
+                                                                  ? Colors
+                                                                  .amber
+                                                                  .shade900
+                                                                  : Colors
+                                                                  .black87,
+                                                            ),
+                                                            overflow: TextOverflow
+                                                                .ellipsis,
+                                                          ),
+                                                        ),
+                                                        Expanded(
+                                                          flex: 4,
+                                                          child: Text(
+                                                            '合計: ${totalCount}試合',
+                                                            style:
+                                                            const TextStyle(
+                                                              fontSize: 13,
+                                                              fontWeight:
+                                                              FontWeight
+                                                                  .bold,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        Expanded(
+                                                          flex: 5,
+                                                          child: Text(
+                                                            'S:$sCount/$maxS  D:$dCount/$maxD  T:$tCount/$maxT',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color: (sCount >=
+                                                                  maxS ||
+                                                                  dCount >=
+                                                                      maxD ||
+                                                                  tCount >=
+                                                                      maxT)
+                                                                  ? Colors
+                                                                  .red
+                                                                  .shade700
+                                                                  : Colors
+                                                                  .black54,
+                                                            ),
+                                                            textAlign:
+                                                            TextAlign.end,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               Expanded(
                                 child: ListView.builder(
                                   padding: const EdgeInsets.all(8),
