@@ -1,6 +1,6 @@
 {
   "name": "hgl-scraper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "GitHub Actions scraper for HGL 2026 One80 Stage (LOCO TRIBE) — SPEC.md §7",
   "type": "commonjs",

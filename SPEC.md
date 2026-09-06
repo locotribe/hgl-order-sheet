@@ -163,8 +163,9 @@ config/app
 ### 構成
 - リポジトリ内 `/scraper` に**実行環境非依存の Node スクリプト**を置く（`puppeteer` + `firebase-admin`）。
 - コア処理（ページ取得→パース→整形）は純関数に分離し、GitHub Actions からも将来Cloud Functionsからも呼べるようにする。
-- Firestore への書き込みは **firebase-admin**（サービスアカウント）で行う。
-- **サービスアカウントJSONは GitHub Secrets（`FIREBASE_SERVICE_ACCOUNT`）に格納**し、絶対にコミットしない。ワークフローで環境変数として渡す。
+- Firestore への書き込みは **firebase-admin** で行う。認証は **Workload Identity Federation（鍵レス）**：
+  `google-github-actions/auth@v2` で一時的な認証情報を取得し、`admin.credential.applicationDefault()` で初期化する。
+  サービスアカウント鍵JSONは発行・保存・コミットしない。
 
 ### 対象データ
 - チーム詳細メンバーリストが**主データ源**（名前・レーティング・各ゲームのスタッツ・勝敗・勝率）。**動的読み込み**のため Puppeteer で描画してから読む（または裏のAPIを叩く）。
@@ -193,7 +194,7 @@ config/app
 3. データモデル（§6）を Firestore に用意。ゲーム定義（§3表）を定数化。
 4. 画面1・2・3・4（§4）を実装。状態は Firestore 購読で共有。
 5. 自動編成ロジック（§5）を Dart 実装＋制約チェック（R1）。
-6. スクレイパー（§7）を `/scraper` に Node スクリプトで実装＋ `.github/workflows/scrape.yml`（cron＋workflow_dispatch）。まず日程一括投入、次に成績取得。サービスアカウントは GitHub Secrets。
+6. スクレイパー（§7）を `/scraper` に Node スクリプトで実装＋ `.github/workflows/scrape.yml`（cron＋workflow_dispatch）。まず日程一括投入、次に成績取得。認証は Workload Identity Federation（鍵レス）。
 7. Firebase Hosting へデプロイ → 得たURLを LINE Developers の LIFFエンドポイントに設定。
 8. Firestore セキュリティルールを本番用に。管理者パスワードをハッシュで設定。
 

@@ -2,17 +2,17 @@ const admin = require('firebase-admin');
 const { normalizeName } = require('./parse');
 
 /**
- * GitHub Secrets の FIREBASE_SERVICE_ACCOUNT（サービスアカウントJSON文字列）から初期化する。
- * このJSONはコミットしない（.gitignore済み・ワークフローの env 経由でのみ渡す）。
+ * Workload Identity Federation（鍵レス）で認証する。
+ * GitHub Actions の google-github-actions/auth@v2 ステップが
+ * GOOGLE_APPLICATION_CREDENTIALS（一時的な認証情報ファイル）を環境変数に
+ * セットした状態でこのプロセスが起動される前提。サービスアカウント鍵JSONは使わない。
  */
 function initFirestore() {
   if (admin.apps.length === 0) {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (!raw) {
-      throw new Error('環境変数 FIREBASE_SERVICE_ACCOUNT が設定されていません。');
-    }
-    const serviceAccount = JSON.parse(raw);
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+      projectId: 'hive-global-league',
+    });
   }
   return admin.firestore();
 }

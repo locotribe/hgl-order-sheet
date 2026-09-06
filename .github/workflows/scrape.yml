@@ -18,11 +18,22 @@ on:
           - results
           - both
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: hive-global-league
+          workload_identity_provider: projects/777924157446/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: firebase-adminsdk-fbsvc@hive-global-league.iam.gserviceaccount.com
 
       - uses: actions/setup-node@v4
         with:
@@ -41,8 +52,6 @@ jobs:
           github.event.schedule == '0 3 * * 1' ||
           (github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'schedule' || github.event.inputs.job == 'both'))
         working-directory: scraper
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: npm run scrape:schedule
 
       - name: Scrape results
@@ -50,6 +59,4 @@ jobs:
           github.event.schedule == '30 14 * * 1' ||
           (github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'results' || github.event.inputs.job == 'both'))
         working-directory: scraper
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: npm run scrape:results
