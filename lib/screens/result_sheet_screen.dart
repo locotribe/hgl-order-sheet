@@ -1,3 +1,4 @@
+// [修正] リザルトシートのUI刷新（フラットなリスト型・大型ボタン化） (v.1.3)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -16,7 +17,7 @@ import '../services/repositories/player_repository.dart';
 import '../services/repositories/week_repository.dart';
 import '../widgets/player_picker_sheet.dart';
 
-/// 画面3：リザルトシート（中心画面）— SPEC.md §4
+/// リザルトシート画面 SPEC.md対応
 class ResultSheetScreen extends StatefulWidget {
   const ResultSheetScreen({super.key});
 
@@ -35,12 +36,12 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('変更できません'),
+        title: const Text('追加できません'),
         content: Text(reason),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('閉じる'),
+            child: const Text('OK'),
           ),
         ],
       ),
@@ -69,17 +70,19 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
       counts: counts,
       currentOccupantId: currentOccupant,
     );
+
     if (selected == null || selected == currentOccupant) return;
     if (!mounted) return;
 
     final used =
         counts.countFor(def.format, selected) -
-        (selected == currentOccupant ? 1 : 0);
+            (selected == currentOccupant ? 1 : 0);
     final remaining = def.perPlayerCap - used;
+
     if (remaining <= 0) {
       final name = idToName[selected] ?? selected;
       _showReasonDialog(
-        '$nameさんは${formatLabel(def.format)}既に${def.perPlayerCap}回のため追加できません',
+        '$name さんは ${formatLabel(def.format)} に既に ${def.perPlayerCap} 回出場しているため追加できません。',
       );
       return;
     }
@@ -100,8 +103,7 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
           final selectedName = idToName[selected] ?? selected;
           final otherName = idToName[other] ?? other;
           _showReasonDialog(
-            '$selectedNameさんと$otherNameさんは同ペアで既に$kMaxSamePairDoubles回組んでいるため、'
-            'これ以上組み合わせられません',
+            '$selectedName さんと $otherName さんのペアは既に $kMaxSamePairDoubles 回組んでいるため追加できません。',
           );
           return;
         }
@@ -138,12 +140,14 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
     );
 
     if (game.number >= 11) return;
+
     final nextGame = allGames.firstWhere((g) => g.number == game.number + 1);
     final nextFirstThrow = newResult == GameResult.pending
         ? FirstThrow.undecided
         : (newResult == GameResult.win
-              ? FirstThrow.second
-              : FirstThrow.first);
+        ? FirstThrow.second
+        : FirstThrow.first);
+
     await _gameRepository.saveAssignment(
       weekId: week.id,
       slot: nextGame.copyWith(firstThrow: nextFirstThrow),
@@ -163,8 +167,9 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (week == null) {
-            return const Center(child: Text('今週の試合予定はまだ登録されていません。'));
+            return const Center(child: Text('今週の試合情報がありません'));
           }
+
           return StreamBuilder<List<Player>>(
             stream: _playerRepository.watchAll(),
             builder: (context, playersSnap) {
@@ -177,6 +182,7 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                     stream: _attendanceRepository.watchAll(week.id),
                     builder: (context, attendanceSnap) {
                       final attendance = attendanceSnap.data ?? [];
+
                       final presentIds = attendance
                           .where((a) => a.present)
                           .map((a) => a.playerId)
@@ -187,13 +193,13 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                             .where((p) => presentIds.contains(p.id))
                             .map(
                               (p) => RosterEntrant(
-                                id: p.id,
-                                name: p.kanjiName,
-                                isGuest: false,
-                              ),
-                            ),
+                            id: p.id,
+                            name: p.kanjiName,
+                            isGuest: false,
+                          ),
+                        ),
                         ...guests.map(
-                          (g) => RosterEntrant(
+                              (g) => RosterEntrant(
                             id: g.id,
                             name: g.name,
                             isGuest: true,
@@ -213,9 +219,10 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                           final games = gamesSnap.data ?? [];
                           if (games.isEmpty) {
                             return const Center(
-                              child: Text('まだオーダーが生成されていません。出席確認画面から生成してください。'),
+                              child: Text('ゲームデータがありません'),
                             );
                           }
+
                           final wins = games
                               .where((g) => g.result == GameResult.win)
                               .length;
@@ -232,7 +239,7 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                                 ).colorScheme.primaryContainer,
                                 padding: const EdgeInsets.all(12),
                                 child: Text(
-                                  '現在のスコア: $wins勝 $losses敗',
+                                  '現在のスコア : $wins 勝 $losses 敗',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -241,12 +248,12 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                               ),
                               Expanded(
                                 child: ListView.builder(
-                                  padding: const EdgeInsets.all(12),
+                                  padding: const EdgeInsets.all(8),
                                   itemCount: games.length,
                                   itemBuilder: (context, index) {
                                     final game = games[index];
                                     final def = kGameDefinitions.firstWhere(
-                                      (d) => d.number == game.number,
+                                          (d) => d.number == game.number,
                                     );
                                     return _GameRow(
                                       game: game,
@@ -318,115 +325,176 @@ class _GameRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final slotCount = def.format.playerCount;
+    final handicapLabel =
+    def.handicap == HandicapType.auto ? 'オートハンデ' : 'ハンデなし';
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(radius: 14, child: Text('${game.number}')),
-                const SizedBox(width: 8),
-                Text(
-                  game.type,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: 8),
-                Chip(
-                  label: Text(formatLabel(def.format)),
-                  visualDensity: VisualDensity.compact,
-                ),
-                if (def.handicap == HandicapType.auto) ...[
-                  const SizedBox(width: 4),
-                  const Chip(
-                    label: Text('オートハンデ'),
-                    visualDensity: VisualDensity.compact,
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      elevation: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 1. GAME Header (Dark Grey)
+          Container(
+            color: Colors.grey.shade800,
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+            child: Text(
+              'GAME ${game.number}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          // 2. Sub Header (Light Blue)
+          Container(
+            color: Colors.blue.shade50,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            alignment: Alignment.center,
+            child: Text(
+              '${game.type} (${formatLabel(def.format)} / $handicapLabel)',
+              style: TextStyle(
+                color: Colors.blue.shade900,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          // 3. Body (First Throw + Players)
+          Row(
+            children: [
+              // Left: 先攻 / 後攻
+              SizedBox(
+                width: 64,
+                child: Center(
+                  child: Text(
+                    _firstThrowLabel,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: game.firstThrow == FirstThrow.undecided
+                          ? Colors.grey
+                          : (game.firstThrow == FirstThrow.first
+                          ? Colors.red.shade700
+                          : Colors.blue.shade700),
+                    ),
                   ),
-                ],
-                const SizedBox(width: 4),
-                Chip(
-                  label: Text(_firstThrowLabel),
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: game.firstThrow == FirstThrow.undecided
-                      ? null
-                      : Colors.blue.withValues(alpha: 0.15),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: List.generate(slotCount, (i) {
-                final id = game.assigned.length > i ? game.assigned[i] : null;
-                final name = id == null
-                    ? '未定'
-                    : (idToName[id] ?? '(不明)');
-                final isGuest = id != null && (isGuestId[id] ?? false);
-                return ActionChip(
-                  label: Text(isGuest ? '$name（ゲスト）' : name),
-                  backgroundColor: isGuest
-                      ? Colors.amber.withValues(alpha: 0.15)
-                      : null,
-                  onPressed: () => onTapSlot(i),
-                );
-              }),
-            ),
-            const SizedBox(height: 8),
-            Row(
+              ),
+              // Divider
+              Container(width: 1, color: Colors.grey.shade300),
+              // Center: プレイヤーリスト
+              Expanded(
+                child: Column(
+                  children: List.generate(slotCount, (i) {
+                    final id =
+                    game.assigned.length > i ? game.assigned[i] : null;
+                    final name = id == null || id.isEmpty
+                        ? '（タップして追加）'
+                        : (idToName[id] ?? '(不明)');
+                    final isGuest = id != null && (isGuestId[id] ?? false);
+
+                    return InkWell(
+                      onTap: () => onTapSlot(i),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 14, horizontal: 16),
+                        decoration: BoxDecoration(
+                          border: i < slotCount - 1
+                              ? Border(
+                              bottom:
+                              BorderSide(color: Colors.grey.shade200))
+                              : null,
+                          color: isGuest
+                              ? Colors.amber.withValues(alpha: 0.1)
+                              : null,
+                        ),
+                        child: Text(
+                          isGuest ? '$name (ゲスト)' : name,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: id == null || id.isEmpty ? Colors.grey : Colors.black87,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 1, thickness: 1),
+          // 4. Bottom: Win/Loss Buttons
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               children: [
-                _ResultButton(
-                  icon: Icons.circle_outlined,
-                  selected: game.result == GameResult.win,
-                  color: Colors.green,
-                  onTap: () => onTapResult(GameResult.win),
+                Expanded(
+                  child: _ResultPanelButton(
+                    label: '◯',
+                    color: Colors.green,
+                    selected: game.result == GameResult.win,
+                    onTap: () => onTapResult(GameResult.win),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                _ResultButton(
-                  icon: Icons.close,
-                  selected: game.result == GameResult.loss,
-                  color: Colors.red,
-                  onTap: () => onTapResult(GameResult.loss),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ResultPanelButton(
+                    label: '✕',
+                    color: Colors.red,
+                    selected: game.result == GameResult.loss,
+                    onTap: () => onTapResult(GameResult.loss),
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ResultButton extends StatelessWidget {
-  const _ResultButton({
-    required this.icon,
-    required this.selected,
+class _ResultPanelButton extends StatelessWidget {
+  const _ResultPanelButton({
+    required this.label,
     required this.color,
+    required this.selected,
     required this.onTap,
   });
 
-  final IconData icon;
-  final bool selected;
+  final String label;
   final Color color;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        width: 44,
-        height: 44,
+        padding: const EdgeInsets.symmetric(vertical: 8),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: selected ? color.withValues(alpha: 0.2) : null,
-          border: Border.all(color: color, width: 2),
+          borderRadius: BorderRadius.circular(8),
+          color: selected ? color.withValues(alpha: 0.15) : Colors.grey.shade50,
+          border: Border.all(
+            color: selected ? color : Colors.grey.shade300,
+            width: selected ? 2 : 1,
+          ),
         ),
-        child: Icon(icon, color: color, size: 24),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: selected ? color : Colors.grey.shade400,
+          ),
+        ),
       ),
     );
   }
