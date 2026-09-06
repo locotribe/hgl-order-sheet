@@ -1,4 +1,4 @@
-// [修正] リザルトシート上部に出場回数・合計試合数のサマリー一覧を追加 (v.1.4)
+// [修正] リザルトシートの出場回数サマリーからアイコンを削除 (v.1.5.3)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -208,7 +208,7 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                       ];
 
                       final idToName = <String, String>{
-                        for (final p in players) p.id: p.kanjiName,
+                        for (final p in players) p.id: p.effectiveName,
                         for (final g in guests) g.id: g.name,
                       };
                       final isGuestId = {for (final g in guests) g.id: true};
@@ -249,13 +249,13 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                                   textAlign: TextAlign.center,
                                 ),
                               ),
-                              // 参加者の出場回数一覧サマリーカード
+                              // 参加者の出場回数一覧サマリーカード（アイコン削除）
                               if (roster.isNotEmpty)
                                 Card(
                                   margin: const EdgeInsets.all(8),
                                   child: ExpansionTile(
                                     title: const Text(
-                                      '📊 出場回数サマリー（タップで展開）',
+                                      '出場回数サマリー（タップで展開）',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,

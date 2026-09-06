@@ -184,7 +184,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                     );
                                   },
                                   icon: const Icon(Icons.group),
-                                  label: const Text('出席状況を見る'),
+                                  label: const Text('出席状況'),
                                 ),
                               ),
                             ],
@@ -259,7 +259,7 @@ class _ProfileCard extends StatelessWidget {
                   Text('公式レーティング : ${player.rating.toStringAsFixed(2)}'),
                   if (player.isProvisional)
                     const Text(
-                      '※手入力の仮レート適用中',
+                      '※手入力の仮レーティング適用中',
                       style: TextStyle(color: Colors.orange, fontSize: 12),
                     ),
                 ],
