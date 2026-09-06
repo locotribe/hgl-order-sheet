@@ -32,6 +32,23 @@
   <title>hgl_order_sheet</title>
   <link rel="manifest" href="manifest.json">
 
+  <script>
+    // 以前のビルドで登録された Service Worker（PWAキャッシュ）を解除する。
+    // 新しいビルドは Service Worker を登録しないが、既にインストール済みの
+    // 端末では解除しない限りキャッシュが残り続け、更新が反映されないため
+    // 一度だけ後始末する。
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        registrations.forEach(function (registration) { registration.unregister(); });
+      });
+    }
+    if (window.caches) {
+      caches.keys().then(function (keys) {
+        keys.forEach(function (key) { caches.delete(key); });
+      });
+    }
+  </script>
+
   <!-- LINE Front-end Framework (LIFF) SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script>
