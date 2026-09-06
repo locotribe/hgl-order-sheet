@@ -1,4 +1,4 @@
-// [修正] 出席確認画面のUIに対戦カードを適用 (v.1.1)
+// [修正] 出席確認ページの参加者一覧で変更された名前を単純に表示するよう修正 (v.1.3)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -157,6 +157,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       final isValid =
                           presentCount >= kMinAttendanceForValidMatch;
 
+                      final presentPlayers = players
+                          .where((p) => presentIds.contains(p.id))
+                          .toList();
+
                       return ListView(
                         padding: const EdgeInsets.all(16),
                         children: [
@@ -188,17 +192,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                           const SizedBox(height: 8),
-                          for (final p in players)
+                          if (presentPlayers.isEmpty && guests.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Text('現在、参加しているメンバーはいません', style: TextStyle(color: Colors.grey)),
+                            ),
+                          for (final p in presentPlayers)
                             ListTile(
-                              leading: Icon(
-                                presentIds.contains(p.id)
-                                    ? Icons.check_circle
-                                    : Icons.radio_button_unchecked,
-                                color: presentIds.contains(p.id)
-                                    ? Colors.green
-                                    : Colors.grey.shade400,
+                              leading: const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
                               ),
-                              title: Text(p.kanjiName),
+                              // 変更されている場合は effectiveName により変更後の名前を単純に表示
+                              title: Text(p.effectiveName),
                               trailing: Text(p.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.black54)),
                             ),
                           for (final g in guests)

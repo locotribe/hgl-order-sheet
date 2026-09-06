@@ -244,12 +244,17 @@ class _AdminScreenState extends State<AdminScreen> {
                   const Divider(height: 32),
                   const Text('メンバー管理（仮レーティング設定）', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
+// [修正] メンバー管理画面のプレイヤー名表示に displayName の括弧書きを追加 (v.1.5)
                   Card(
                     child: Column(
                       children: [
                         for (final p in players)
                           ListTile(
-                            title: Text(p.kanjiName),
+                            title: Text(
+                              (p.displayName != null && p.displayName!.trim().isNotEmpty && p.displayName != p.kanjiName)
+                                  ? '${p.kanjiName} (${p.displayName})'
+                                  : p.kanjiName,
+                            ),
                             subtitle: Text(
                               p.isProvisional
                                   ? '仮レーティング: ${p.effectiveStats01.toStringAsFixed(2)}'
