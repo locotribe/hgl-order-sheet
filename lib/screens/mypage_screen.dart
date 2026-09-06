@@ -200,7 +200,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: selectedTime,
+                    initialValue: selectedTime,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       isDense: true,
