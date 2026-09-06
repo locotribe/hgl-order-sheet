@@ -43,12 +43,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       List<Attendance> attendance,
       List<Guest> guests,
       ) async {
-    final presentIds = attendance
-        .where((a) => a.present)
+    final validPresentIds = attendance
+        .where((a) {
+      if (!a.present) return false;
+      if (a.arrivalTime != null && a.arrivalTime!.isNotEmpty) {
+        return a.isArrived;
+      }
+      return true;
+    })
         .map((a) => a.playerId)
         .toSet();
 
-    final presentPlayers = players.where((p) => presentIds.contains(p.id));
+    final presentPlayers = players.where((p) => validPresentIds.contains(p.id));
     final entrants = [
       ...presentPlayers.map(
             (p) => AssignmentEntrant(
@@ -70,7 +76,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     if (entrants.length < kMinAttendanceForValidMatch) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('3名以上の参加が必要です')),
+        const SnackBar(content: Text('条件を満たす有効な参加者が3名以上必要です（遅刻者は管理者の到着確認が必要です）')),
       );
       return;
     }
@@ -149,6 +155,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     builder: (context, guestSnap) {
                       final guests = guestSnap.data ?? [];
 
+                      final attendanceMap = {for (var a in attendance) a.playerId: a};
+
                       final presentIds = attendance
                           .where((a) => a.present)
                           .map((a) => a.playerId)
@@ -198,14 +206,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                               child: Text('現在、参加しているメンバーはいません', style: TextStyle(color: Colors.grey)),
                             ),
                           for (final p in presentPlayers)
-                            ListTile(
-                              leading: const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                              ),
-                              // 変更されている場合は effectiveName により変更後の名前を単純に表示
-                              title: Text(p.effectiveName),
-                              trailing: Text(p.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.black54)),
+                            Builder(
+                              builder: (context) {
+                                final att = attendanceMap[p.id];
+                                final arrivalTime = att?.arrivalTime;
+                                final isArrived = att?.isArrived ?? false;
+
+                                return ListTile(
+                                  leading: const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                  ),
+                                  title: Text(p.effectiveName),
+                                  trailing: arrivalTime != null && arrivalTime.isNotEmpty
+                                      ? Text(
+                                    '到着予定: $arrivalTime${isArrived ? " (到着済)" : " (要確認)"}',
+                                    style: TextStyle(
+                                      color: isArrived ? Colors.green.shade700 : Colors.orange.shade800,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  )
+                                      : null,
+                                );
+                              },
                             ),
                           for (final g in guests)
                             ListTile(
@@ -215,7 +239,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                                 color: Colors.amber,
                               ),
                               title: Text('${g.name} (ゲスト)'),
-                              trailing: Text(g.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.black54)),
+                              trailing: Text('${g.rating.toStringAsFixed(1)}', style: const TextStyle(color: Colors.black54)),
                             ),
                           const SizedBox(height: 32),
                           OutlinedButton.icon(

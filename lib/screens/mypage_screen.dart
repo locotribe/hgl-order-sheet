@@ -71,10 +71,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
 
     try {
       if (kIsWeb) {
-        // Webブラウザ・LIFF内からは他アプリのインストール状態を検知できないため、直接起動を試みる
         await launchUrl(appUrl, mode: LaunchMode.externalApplication);
       } else {
-        // ネイティブアプリとして動いている場合
         if (await canLaunchUrl(appUrl)) {
           await launchUrl(appUrl, mode: LaunchMode.externalApplication);
           return;
@@ -82,7 +80,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
         throw Exception('App not installed');
       }
     } catch (e) {
-      // 起動に失敗した場合（未インストールなど）は各OSのストアへ誘導
       if (isAndroid) {
         await _launchWeb('https://play.google.com/store/apps/details?id=com.dartslive.dlsports');
       } else if (isIOS) {
@@ -145,6 +142,117 @@ class _MyPageScreenState extends State<MyPageScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('表示名を変更しました')),
+      );
+    }
+  }
+
+  Future<void> _handleAttendanceToggle({
+    required Week week,
+    required String myId,
+    required bool isPresent,
+  }) async {
+    if (isPresent) {
+      final games = await _gameRepository.getAllOnce(week.id);
+      if (games.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('既にオーダーが生成されているため、不参加への変更は管理者に依頼してください')),
+          );
+        }
+        return;
+      }
+
+      await _attendanceRepository.setPresent(
+        weekId: week.id,
+        playerId: myId,
+        present: false,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('参加を取り消しました')),
+        );
+      }
+      return;
+    }
+
+    final times = ['20:50', '21:00', '21:10', '21:20', '21:30'];
+    String? selectedTime;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('参加確認'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '試合開始十分前までに到着できない方は、下記の時刻を選んでください。それより前に来れる方は入力不要です。',
+                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '到着予定時刻（任意）:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: selectedTime,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    hint: const Text('指定しない（通常通り参加）'),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('指定しない（通常通り参加）'),
+                      ),
+                      for (final t in times)
+                        DropdownMenuItem<String>(
+                          value: t,
+                          child: Text(t),
+                        ),
+                    ],
+                    onChanged: (val) {
+                      setDialogState(() {
+                        selectedTime = val;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('キャンセル'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('参加する'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    await _attendanceRepository.setPresent(
+      weekId: week.id,
+      playerId: myId,
+      present: true,
+      arrivalTime: selectedTime,
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('参加を記録しました')),
       );
     }
   }
@@ -271,31 +379,11 @@ class _MyPageScreenState extends State<MyPageScreen> {
                             children: [
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  onPressed: () async {
-                                    if (isPresent) {
-                                      final games = await _gameRepository.getAllOnce(week.id);
-                                      if (games.isNotEmpty) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('既にオーダーが生成されているため、不参加への変更は管理者に依頼してください')),
-                                          );
-                                        }
-                                        return;
-                                      }
-                                    }
-
-                                    final newState = !isPresent;
-                                    await _attendanceRepository.setPresent(
-                                      weekId: week.id,
-                                      playerId: myId,
-                                      present: newState,
-                                    );
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text(newState ? '参加を記録しました' : '参加を取り消しました')),
-                                      );
-                                    }
-                                  },
+                                  onPressed: () => _handleAttendanceToggle(
+                                    week: week,
+                                    myId: myId,
+                                    isPresent: isPresent,
+                                  ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: isPresent ? Colors.red.shade600 : null,
                                     foregroundColor: isPresent ? Colors.white : null,

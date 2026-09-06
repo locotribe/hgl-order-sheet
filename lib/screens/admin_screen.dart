@@ -27,7 +27,7 @@ class _AdminScreenState extends State<AdminScreen> {
   final _weekRepository = WeekRepository();
   final _configRepository = ConfigRepository();
   final _attendanceRepository = AttendanceRepository();
-  final _gameRepository = GameRepository(); // 追加
+  final _gameRepository = GameRepository();
 
   Future<void> _editManualRating(Player player) async {
     final controller = TextEditingController(
@@ -165,7 +165,6 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 自身のIDを取得（オーダー修正履歴の editedBy として使用）
     final myId = context.watch<AppState>().currentPlayer!.id;
 
     return Scaffold(
@@ -186,39 +185,81 @@ class _AdminScreenState extends State<AdminScreen> {
                   const Text('本日の出欠・ゲスト管理', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
                   if (week == null)
-                    const Text('今週の試合情報がありません')
+                    const Text('今週の試合情報가ありません')
                   else ...[
                     StreamBuilder<List<Attendance>>(
                       stream: _attendanceRepository.watchAll(week.id),
                       builder: (context, attSnap) {
                         final attendance = attSnap.data ?? [];
+                        final attendanceMap = {for (var a in attendance) a.playerId: a};
                         final presentIds = attendance.where((a) => a.present).map((a) => a.playerId).toSet();
 
                         return Card(
                           child: Column(
                             children: [
                               for (final p in players)
-                                SwitchListTile(
-                                  title: Text(p.effectiveName),
-                                  subtitle: Text(
-                                    presentIds.contains(p.id) ? '参加' : '未参加',
-                                    style: TextStyle(color: presentIds.contains(p.id) ? Colors.green : Colors.grey),
-                                  ),
-                                  value: presentIds.contains(p.id),
-                                  onChanged: (val) async {
-                                    await _attendanceRepository.setPresent(
-                                      weekId: week.id,
-                                      playerId: p.id,
-                                      present: val,
+                                Builder(
+                                  builder: (context) {
+                                    final isPresent = presentIds.contains(p.id);
+                                    final att = attendanceMap[p.id];
+                                    final arrivalTime = att?.arrivalTime;
+                                    final isArrived = att?.isArrived ?? false;
+
+                                    return Column(
+                                      children: [
+                                        SwitchListTile(
+                                          title: Text(p.effectiveName),
+                                          subtitle: Text(
+                                            isPresent ? '参加' : '未参加',
+                                            style: TextStyle(color: isPresent ? Colors.green : Colors.grey),
+                                          ),
+                                          value: isPresent,
+                                          onChanged: (val) async {
+                                            await _attendanceRepository.setPresent(
+                                              weekId: week.id,
+                                              playerId: p.id,
+                                              present: val,
+                                            );
+                                            if (!val) {
+                                              await _gameRepository.removePlayerFromPendingGames(
+                                                weekId: week.id,
+                                                playerId: p.id,
+                                                editedBy: myId,
+                                              );
+                                            }
+                                          },
+                                        ),
+                                        if (isPresent && arrivalTime != null && arrivalTime.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(
+                                                  '到着予定時刻: $arrivalTime',
+                                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.orange),
+                                                ),
+                                                Row(
+                                                  children: [
+                                                    const Text('到着確認:', style: TextStyle(fontSize: 12)),
+                                                    Checkbox(
+                                                      value: isArrived,
+                                                      onChanged: (checked) async {
+                                                        await _attendanceRepository.setArrived(
+                                                          weekId: week.id,
+                                                          playerId: p.id,
+                                                          isArrived: checked ?? false,
+                                                        );
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        const Divider(height: 1),
+                                      ],
                                     );
-                                    // 未参加に変更された場合、未決着のゲームからのみ枠を空にする
-                                    if (!val) {
-                                      await _gameRepository.removePlayerFromPendingGames(
-                                        weekId: week.id,
-                                        playerId: p.id,
-                                        editedBy: myId,
-                                      );
-                                    }
                                   },
                                 ),
                             ],
