@@ -1,0 +1,16 @@
+{
+  "name": "hgl-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GitHub Actions scraper for HGL 2026 One80 Stage (LOCO TRIBE) — SPEC.md §7",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test src/*.test.js",
+    "scrape:schedule": "node scrapeSchedule.js",
+    "scrape:results": "node scrapeResults.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "puppeteer": "^23.9.0"
+  }
+}

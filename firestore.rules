@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// 開発中の暫定ルール（テストモード相当）。
+// TODO(本番前 / SPEC §8 step8, 実装計画 Phase J):
+//   LIFF IDトークン → Cloud Functions で Firebase Custom Token に交換 → signInWithCustomToken
+//   という認証ブリッジを追加した上で、request.auth.uid（= lineUserId）ベースの
+//   本人限定書き込みルールに締める。
+// 期限を切ってあるので、本番化を忘れた場合は自動的に読み書き不可になる。
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.time < timestamp.date(2026, 12, 31);
+    }
+  }
+}

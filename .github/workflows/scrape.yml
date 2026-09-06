@@ -1,0 +1,55 @@
+name: HGL scraper
+
+on:
+  schedule:
+    # 日程照合：毎週月曜 12:00 JST
+    - cron: '0 3 * * 1'
+    # 成績取得：毎週月曜 23:30 JST 頃（試合21:00開始→終了後を狙う）
+    - cron: '30 14 * * 1'
+  workflow_dispatch:
+    inputs:
+      job:
+        description: '実行するジョブ'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - schedule
+          - results
+          - both
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: scraper
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: scraper
+        run: npm test
+
+      - name: Scrape schedule
+        if: >
+          github.event.schedule == '0 3 * * 1' ||
+          (github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'schedule' || github.event.inputs.job == 'both'))
+        working-directory: scraper
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: npm run scrape:schedule
+
+      - name: Scrape results
+        if: >
+          github.event.schedule == '30 14 * * 1' ||
+          (github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'results' || github.event.inputs.job == 'both'))
+        working-directory: scraper
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: npm run scrape:results
