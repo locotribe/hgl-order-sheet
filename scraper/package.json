@@ -1,6 +1,6 @@
 {
   "name": "hgl-scraper",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "GitHub Actions scraper for HGL 2026 One80 Stage (LOCO TRIBE) — SPEC.md §7",
   "type": "commonjs",
@@ -10,7 +10,7 @@
     "scrape:results": "node scrapeResults.js"
   },
   "dependencies": {
-    "firebase-admin": "^12.7.0",
+    "@google-cloud/firestore": "^9.0.1",
     "puppeteer": "^23.9.0"
   }
 }

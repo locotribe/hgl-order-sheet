@@ -1,20 +1,17 @@
-const admin = require('firebase-admin');
+const { Firestore } = require('@google-cloud/firestore');
 const { normalizeName } = require('./parse');
 
 /**
  * Workload Identity Federation（鍵レス）で認証する。
- * GitHub Actions の google-github-actions/auth@v2 ステップが
- * GOOGLE_APPLICATION_CREDENTIALS（一時的な認証情報ファイル）を環境変数に
- * セットした状態でこのプロセスが起動される前提。サービスアカウント鍵JSONは使わない。
+ *
+ * firebase-admin は GOOGLE_APPLICATION_CREDENTIALS が external_account
+ * （WIF）形式の場合に "Invalid contents in the credentials file" で失敗するため、
+ * google-auth-library を直接使う @google-cloud/firestore に切り替えている。
+ * こちらは external_account 形式を正しく解釈できる。
+ * サービスアカウント鍵JSONは使わない・発行しない。
  */
 function initFirestore() {
-  if (admin.apps.length === 0) {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-      projectId: 'hive-global-league',
-    });
-  }
-  return admin.firestore();
+  return new Firestore({ projectId: 'hive-global-league' });
 }
 
 /**
@@ -28,7 +25,7 @@ async function upsertWeeks(db, scheduleRecords) {
     batch.set(
       ref,
       {
-        date: admin.firestore.Timestamp.fromDate(new Date(record.date)),
+        date: Firestore.Timestamp.fromDate(new Date(record.date)),
         opponentTeam: record.opponentTeam,
         homeAway: record.homeAway,
         status: record.status,

@@ -161,10 +161,13 @@ config/app
 **実行環境は Firebase Cloud Functions ではなく GitHub Actions を使う**（Blaze不要・無料）。
 
 ### 構成
-- リポジトリ内 `/scraper` に**実行環境非依存の Node スクリプト**を置く（`puppeteer` + `firebase-admin`）。
+- リポジトリ内 `/scraper` に**実行環境非依存の Node スクリプト**を置く（`puppeteer` + `@google-cloud/firestore`）。
 - コア処理（ページ取得→パース→整形）は純関数に分離し、GitHub Actions からも将来Cloud Functionsからも呼べるようにする。
-- Firestore への書き込みは **firebase-admin** で行う。認証は **Workload Identity Federation（鍵レス）**：
-  `google-github-actions/auth@v2` で一時的な認証情報を取得し、`admin.credential.applicationDefault()` で初期化する。
+- Firestore への書き込みは **`@google-cloud/firestore`** で行う（`firebase-admin` は使わない。
+  Workload Identity Federation の external_account 形式クレデンシャルを firebase-admin が正しく
+  解釈できないため、google-auth-library を直接使う `@google-cloud/firestore` に切り替えている）。
+- 認証は **Workload Identity Federation（鍵レス）**：`google-github-actions/auth@v2` で一時的な
+  認証情報を取得し、`new Firestore({ projectId: 'hive-global-league' })` がそれを自動で解釈する。
   サービスアカウント鍵JSONは発行・保存・コミットしない。
 
 ### 対象データ
