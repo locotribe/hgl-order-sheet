@@ -1,4 +1,5 @@
-// [修正] オーダー生成後は一般ユーザーの不参加変更をブロックする機能を追加 (v.1.5)
+// [修正] 管理者メニューボタンを廃止し、タイトル5回タップの隠し扉に変更 (v.1.6)
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -26,7 +27,35 @@ class _MyPageScreenState extends State<MyPageScreen> {
   final _weekRepository = WeekRepository();
   final _playerRepository = PlayerRepository();
   final _attendanceRepository = AttendanceRepository();
-  final _gameRepository = GameRepository(); // 追加
+  final _gameRepository = GameRepository();
+
+  // 隠し扉用のステート変数
+  int _adminTapCount = 0;
+  Timer? _adminTapTimer;
+
+  @override
+  void dispose() {
+    _adminTapTimer?.cancel();
+    super.dispose();
+  }
+
+  // タイトルタップ時の処理
+  void _handleAdminTap() {
+    _adminTapTimer?.cancel();
+    _adminTapCount++;
+
+    if (_adminTapCount >= 5) {
+      _adminTapCount = 0;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AdminGateScreen()),
+      );
+    } else {
+      // 1秒間次のタップがなければカウントをリセット
+      _adminTapTimer = Timer(const Duration(seconds: 1), () {
+        _adminTapCount = 0;
+      });
+    }
+  }
 
   Future<void> _editDisplayName(Player player) async {
     final controller = TextEditingController(text: player.effectiveName);
@@ -92,7 +121,12 @@ class _MyPageScreenState extends State<MyPageScreen> {
     final myId = appState.currentPlayer!.id;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('マイページ')),
+      appBar: AppBar(
+        title: GestureDetector(
+          onTap: _handleAdminTap,
+          child: const Text('マイページ'),
+        ),
+      ),
       body: StreamBuilder<Player?>(
         stream: _playerRepository.watchById(myId),
         initialData: appState.currentPlayer,
@@ -157,7 +191,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
                               Expanded(
                                 child: ElevatedButton.icon(
                                   onPressed: () async {
-                                    // 不参加に変更しようとしている場合、オーダーが存在するかチェック
                                     if (isPresent) {
                                       final games = await _gameRepository.getAllOnce(week.id);
                                       if (games.isNotEmpty) {
@@ -217,16 +250,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ResultSheetScreen()),
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.lock),
-                label: const Text('管理者メニュー'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AdminGateScreen()),
                   );
                 },
               ),
