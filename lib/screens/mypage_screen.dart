@@ -1,6 +1,6 @@
-// [追加] 外部URL起動のためのパッケージ (v.1.7)
+// [修正] Web環境でクラッシュする dart:io の Platform 判定を foundation の defaultTargetPlatform に置き換え (v.1.8)
 import 'dart:async';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -56,7 +56,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
     }
   }
 
-  // [追加] URLスキームとウェブ起動処理 (v.1.7)
   Future<void> _launchWeb(String urlString) async {
     final url = Uri.parse(urlString);
     if (await canLaunchUrl(url)) {
@@ -64,16 +63,29 @@ class _MyPageScreenState extends State<MyPageScreen> {
     }
   }
 
+  // [修正] Web環境（LIFF等）でもクラッシュせずにOSを判定・起動するロジックに変更 (v.1.8)
   Future<void> _launchAppOrStore() async {
     final appUrl = Uri.parse('dlsports://');
-    if (await canLaunchUrl(appUrl)) {
-      // インストール済みの場合はアプリを直接起動
-      await launchUrl(appUrl, mode: LaunchMode.externalApplication);
-    } else {
-      // 未インストールの場合は各OSのストアへ誘導
-      if (Platform.isAndroid) {
+    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
+    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+
+    try {
+      if (kIsWeb) {
+        // Webブラウザ・LIFF内からは他アプリのインストール状態を検知できないため、直接起動を試みる
+        await launchUrl(appUrl, mode: LaunchMode.externalApplication);
+      } else {
+        // ネイティブアプリとして動いている場合
+        if (await canLaunchUrl(appUrl)) {
+          await launchUrl(appUrl, mode: LaunchMode.externalApplication);
+          return;
+        }
+        throw Exception('App not installed');
+      }
+    } catch (e) {
+      // 起動に失敗した場合（未インストールなど）は各OSのストアへ誘導
+      if (isAndroid) {
         await _launchWeb('https://play.google.com/store/apps/details?id=com.dartslive.dlsports');
-      } else if (Platform.isIOS) {
+      } else if (isIOS) {
         await _launchWeb('https://apps.apple.com/jp/app/dartslive-sports/id1400105618');
       }
     }
@@ -209,7 +221,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
                           MatchInfoCard(week: week),
                           const SizedBox(height: 8),
 
-                          // [追加] 公式ページとアプリ起動リンク (v.1.7)
                           InkWell(
                             onTap: () => _launchWeb('https://dartshive.com/league/'),
                             child: const Padding(
@@ -239,7 +250,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                       'assets/image_f6d8df.png',
                                       width: 24,
                                       height: 24,
-                                      // 万が一画像が読み込めない場合のフォールバック
                                       errorBuilder: (context, error, stackTrace) =>
                                       const Icon(Icons.sports_esports, size: 24),
                                     ),
