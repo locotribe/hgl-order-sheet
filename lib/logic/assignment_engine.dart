@@ -1,10 +1,9 @@
+// [追加] A-1 リザルトシート自動生成のコア実装 (v.1.0)
 import 'dart:math';
-
 import '../config/game_definitions.dart';
 import '../models/game_slot.dart';
 import '../models/week.dart';
 
-/// 自動編成エンジンへの入力となる、レギュラー/ゲスト共通の出場候補者。
 class AssignmentEntrant {
   const AssignmentEntrant({
     required this.id,
@@ -35,9 +34,6 @@ class AssignmentResult {
   const AssignmentResult({required this.assignments, required this.feasible});
 
   final List<GameAssignment> assignments;
-
-  /// false の場合、規定上限を守り切れず苦渋の割り当てをした箇所がある
-  /// （3人未満など極端なケースのみ想定。通常は true になるはず）。
   final bool feasible;
 }
 
@@ -49,17 +45,9 @@ class AssignmentException implements Exception {
   String toString() => message;
 }
 
-/// SPEC.md §5 のグリーディ＋バランス編成アルゴリズム。
-///
-/// 方針：
-/// - 出場回数が少ない人を最優先（バランス）。
-/// - ハンデなし・クリケット系ゲームは該当軸スタッツをそのまま加点。
-/// - 01系オートハンデゲームは先攻+/後攻-の傾き（第1ゲームのみHOME/AWAYで既知、以降は中立）。
-/// - ダブルスは同ペア2回までの上限を満たしつつ、ペア使用回数が少ない組み合わせを優先。
-/// - 上記だけでは埋まらない極小人数ケースに備え、乱数シードを変えた再試行フォールバックを持つ。
 class AssignmentEngine {
-  static const double _balanceWeight = 1000;
-  static const double _pairRepeatWeight = 500;
+  static const double _balanceWeight = 1000.0;
+  static const double _pairRepeatWeight = 500.0;
   static const double _strengthWeight = 1.0;
   static const int _maxAttempts = 500;
 
@@ -69,21 +57,27 @@ class AssignmentEngine {
     int? randomSeed,
   }) {
     if (entrants.length < 3) {
-      throw AssignmentException('最低3人が必要です（現在${entrants.length}人）。');
+      throw AssignmentException('最低3名の参加者が必要です。現在の人数: ${entrants.length}名');
     }
+
     final random = Random(randomSeed);
+
+    // 規定を完全に満たす編成を探索（ランダム性で複数回トライ）
     for (var attempt = 0; attempt < _maxAttempts; attempt++) {
       final result = _tryGenerate(entrants, homeAway, random);
       if (result != null) {
         return AssignmentResult(assignments: result, feasible: true);
       }
     }
+
+    // 規定を完全に満たす解が見つからない場合は、ベストエフォート（ソフトルール違反許容）で生成
     final bestEffort = _tryGenerate(
       entrants,
       homeAway,
       random,
       bestEffort: true,
     )!;
+
     return AssignmentResult(assignments: bestEffort, feasible: false);
   }
 
@@ -93,11 +87,11 @@ class AssignmentEngine {
   }
 
   List<GameAssignment>? _tryGenerate(
-    List<AssignmentEntrant> entrants,
-    HomeAway homeAway,
-    Random random, {
-    bool bestEffort = false,
-  }) {
+      List<AssignmentEntrant> entrants,
+      HomeAway homeAway,
+      Random random, {
+        bool bestEffort = false,
+      }) {
     final singlesCount = <String, int>{for (final e in entrants) e.id: 0};
     final doublesCount = <String, int>{for (final e in entrants) e.id: 0};
     final triosCount = <String, int>{for (final e in entrants) e.id: 0};
@@ -109,31 +103,43 @@ class AssignmentEngine {
       final axisStat = def.strengthAxis == StrengthAxis.zeroOne
           ? e.stats01
           : e.statsCricket;
+
+      // 同点時のランダム揺らぎ
       final jitter = random.nextDouble() * 0.01;
+
+      // ハンデなし、またはクリケットの場合は常に強さ優先（ポジティブ加点）
       if (def.handicap == HandicapType.none ||
           def.strengthAxis == StrengthAxis.cricket) {
-        return base + axisStat * _strengthWeight + jitter;
+        return base + (axisStat * _strengthWeight) + jitter;
       }
-      return base + axisStat * _strengthWeight * leanSign + jitter;
+
+      // 01系オートハンデの場合、leanSign によって強弱の狙いを変える
+      return base + (axisStat * _strengthWeight * leanSign) + jitter;
     }
 
     final assignments = <GameAssignment>[];
 
     for (final def in kGameDefinitions) {
+      // 第1ゲームはHOME先攻(強い人寄せ=1)、AWAY後攻(弱い人寄せ=-1)。以降は0(中立)
       final leanSign = def.number == 1
           ? (homeAway == HomeAway.home ? 1 : -1)
           : 0;
+
       final capField = switch (def.format) {
         GameFormat.singles => singlesCount,
         GameFormat.doubles => doublesCount,
         GameFormat.trios => triosCount,
       };
+
+      // 各フォーマットの出場上限に達していないメンバーを抽出
       final eligible = entrants
           .where((e) => capField[e.id]! < def.perPlayerCap)
           .toList();
+
       final scored = {for (final e in eligible) e.id: score(e, def, leanSign)};
 
       List<String> chosen;
+
       if (def.format == GameFormat.doubles) {
         chosen = _pickPair(
           eligible: eligible,
@@ -145,11 +151,14 @@ class AssignmentEngine {
       } else {
         final needed = def.format.playerCount;
         if (eligible.length < needed && !bestEffort) return null;
+
         final sortedIds = [...eligible.map((e) => e.id)]
           ..sort((a, b) => scored[b]!.compareTo(scored[a]!));
+
         chosen = sortedIds.take(needed).toList();
       }
 
+      // カウントの更新
       for (final id in chosen) {
         totalGames[id] = totalGames[id]! + 1;
         capField[id] = capField[id]! + 1;
@@ -161,8 +170,8 @@ class AssignmentEngine {
           assignedIds: chosen,
           firstThrow: def.number == 1
               ? (homeAway == HomeAway.home
-                    ? FirstThrow.first
-                    : FirstThrow.second)
+              ? FirstThrow.first
+              : FirstThrow.second)
               : FirstThrow.undecided,
         ),
       );
@@ -171,8 +180,6 @@ class AssignmentEngine {
     return assignments;
   }
 
-  /// ペア上限（同ペア2回まで）を満たしつつ、合計スコア - ペア使用回数ペナルティ が
-  /// 最大になる2人組を選ぶ。上限内の組が無い場合、bestEffort時のみスコア上位2人を強制選択する。
   List<String>? _pickPair({
     required List<AssignmentEntrant> eligible,
     required Map<String, double> scored,
@@ -182,30 +189,41 @@ class AssignmentEngine {
     if (eligible.length < 2) {
       return bestEffort ? eligible.map((e) => e.id).toList() : null;
     }
+
     double? bestScore;
     List<AssignmentEntrant>? bestPair;
+
     for (var i = 0; i < eligible.length; i++) {
       for (var j = i + 1; j < eligible.length; j++) {
         final a = eligible[i];
         final b = eligible[j];
+
         final used = pairCount[_pairKey(a.id, b.id)] ?? 0;
-        if (used >= kMaxSamePairDoubles) continue;
+
+        // ペア上限違反の回避（ベストエフォート時以外）
+        if (used >= kMaxSamePairDoubles && !bestEffort) continue;
+
         final pairScore =
-            scored[a.id]! + scored[b.id]! - used * _pairRepeatWeight;
+            scored[a.id]! + scored[b.id]! - (used * _pairRepeatWeight);
+
         if (bestScore == null || pairScore > bestScore) {
           bestScore = pairScore;
           bestPair = [a, b];
         }
       }
     }
+
     if (bestPair == null) {
       if (!bestEffort) return null;
+      // 強制選出
       final sortedEligible = [...eligible]
         ..sort((x, y) => scored[y.id]!.compareTo(scored[x.id]!));
       return sortedEligible.take(2).map((e) => e.id).toList();
     }
+
     final key = _pairKey(bestPair[0].id, bestPair[1].id);
     pairCount[key] = (pairCount[key] ?? 0) + 1;
+
     return bestPair.map((e) => e.id).toList();
   }
 }

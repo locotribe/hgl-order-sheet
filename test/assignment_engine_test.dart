@@ -1,3 +1,4 @@
+// [修正] アルゴリズム動作検証テスト (v.1.1)
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,7 @@ import 'package:hgl_order_sheet/models/week.dart';
 List<AssignmentEntrant> _randomEntrants(Random random, int n) {
   return List.generate(
     n,
-    (i) => AssignmentEntrant(
+        (i) => AssignmentEntrant(
       id: 'p$i',
       name: 'Player $i',
       stats01: 20 + random.nextDouble() * 60,
@@ -19,9 +20,9 @@ List<AssignmentEntrant> _randomEntrants(Random random, int n) {
 }
 
 void _assertNoRuleViolations(
-  List<AssignmentEntrant> entrants,
-  AssignmentResult result,
-) {
+    List<AssignmentEntrant> entrants,
+    AssignmentResult result,
+    ) {
   final singlesCount = <String, int>{};
   final doublesCount = <String, int>{};
   final triosCount = <String, int>{};
@@ -133,7 +134,7 @@ void main() {
   test('3人未満はエラーになる', () {
     final entrants = _randomEntrants(Random(3), 2);
     expect(
-      () => engine.generate(entrants: entrants, homeAway: HomeAway.home),
+          () => engine.generate(entrants: entrants, homeAway: HomeAway.home),
       throwsA(isA<AssignmentException>()),
     );
   });

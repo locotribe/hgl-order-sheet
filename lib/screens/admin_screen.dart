@@ -1,13 +1,15 @@
+// [修正] 管理者機能（メンバーの出欠手動切り替え追加） (v.1.2)
 import 'package:flutter/material.dart';
-
+import '../models/guest.dart';
 import '../models/player.dart';
 import '../models/week.dart';
+import '../models/attendance.dart';
 import '../services/repositories/config_repository.dart';
 import '../services/repositories/guest_repository.dart';
 import '../services/repositories/player_repository.dart';
 import '../services/repositories/week_repository.dart';
+import '../services/repositories/attendance_repository.dart';
 
-/// 画面4：管理者画面 — SPEC.md §4
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
 
@@ -20,19 +22,30 @@ class _AdminScreenState extends State<AdminScreen> {
   final _guestRepository = GuestRepository();
   final _weekRepository = WeekRepository();
   final _configRepository = ConfigRepository();
+  final _attendanceRepository = AttendanceRepository();
 
   Future<void> _editManualRating(Player player) async {
     final controller = TextEditingController(
       text: (player.manualRating ?? player.rating).toString(),
     );
+    final formKey = GlobalKey<FormState>();
+
     final result = await showDialog<double>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('${player.kanjiName} のレート手入力'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'レート'),
+        title: Text('${player.kanjiName} のレーティング手入力'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: '仮レーティング'),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'レーティングを入力してください';
+              if (double.tryParse(v) == null) return '数値を正しく入力してください';
+              return null;
+            },
+          ),
         ),
         actions: [
           TextButton(
@@ -41,7 +54,8 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           FilledButton(
             onPressed: () {
-              final value = double.tryParse(controller.text);
+              if (!formKey.currentState!.validate()) return;
+              final value = double.parse(controller.text);
               Navigator.of(context).pop(value);
             },
             child: const Text('保存'),
@@ -49,6 +63,7 @@ class _AdminScreenState extends State<AdminScreen> {
         ],
       ),
     );
+
     if (result == null) return;
     await _playerRepository.setManualRating(
       playerId: player.id,
@@ -60,10 +75,11 @@ class _AdminScreenState extends State<AdminScreen> {
     final nameController = TextEditingController();
     final ratingController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ゲスト追加（その日限り）'),
+        title: const Text('ゲスト追加'),
         content: Form(
           key: formKey,
           child: Column(
@@ -73,18 +89,14 @@ class _AdminScreenState extends State<AdminScreen> {
                 controller: nameController,
                 decoration: const InputDecoration(labelText: '名前'),
                 validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? '名前を入力してください' : null,
+                (v == null || v.trim().isEmpty) ? '名前を入力してください' : null,
               ),
               TextFormField(
                 controller: ratingController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(labelText: 'レート（必須）'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'レーティング'),
                 validator: (v) {
-                  if (v == null || double.tryParse(v) == null) {
-                    return 'レートを数値で入力してください';
-                  }
+                  if (v == null || double.tryParse(v) == null) return '正しい数値を入力してください';
                   return null;
                 },
               ),
@@ -106,6 +118,7 @@ class _AdminScreenState extends State<AdminScreen> {
         ],
       ),
     );
+
     if (confirmed != true) return;
     await _guestRepository.add(
       weekId: week.id,
@@ -132,79 +145,139 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('変更する'),
+            child: const Text('変更'),
           ),
         ],
       ),
     );
+
     if (confirmed != true || controller.text.isEmpty) return;
     await _configRepository.changePassword(controller.text);
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('パスワードを変更しました')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('パスワードを変更しました')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('管理者画面')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('メンバー管理', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          StreamBuilder<List<Player>>(
+      appBar: AppBar(title: const Text('管理者メニュー')),
+      body: StreamBuilder<Week?>(
+        stream: _weekRepository.watchCurrentWeek(),
+        builder: (context, weekSnap) {
+          final week = weekSnap.data;
+
+          return StreamBuilder<List<Player>>(
             stream: _playerRepository.watchAll(),
-            builder: (context, snap) {
-              final players = snap.data ?? [];
-              return Column(
+            builder: (context, playersSnap) {
+              final players = playersSnap.data ?? [];
+
+              return ListView(
+                padding: const EdgeInsets.all(16),
                 children: [
-                  for (final p in players)
-                    ListTile(
-                      title: Text(p.kanjiName),
-                      subtitle: Text(
-                        p.isProvisional
-                            ? '暫定レート: ${p.effectiveStats01.toStringAsFixed(2)}'
-                            : 'レート: ${p.rating.toStringAsFixed(2)}',
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.edit),
-                        tooltip: 'レート手入力',
-                        onPressed: () => _editManualRating(p),
-                      ),
+                  const Text('本日の出欠・ゲスト管理', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  if (week == null)
+                    const Text('今週の試合情報がありません')
+                  else ...[
+                    StreamBuilder<List<Attendance>>(
+                      stream: _attendanceRepository.watchAll(week.id),
+                      builder: (context, attSnap) {
+                        final attendance = attSnap.data ?? [];
+                        final presentIds = attendance.where((a) => a.present).map((a) => a.playerId).toSet();
+
+                        return Card(
+                          child: Column(
+                            children: [
+                              for (final p in players)
+                                SwitchListTile(
+                                  title: Text(p.kanjiName),
+                                  subtitle: Text(
+                                    presentIds.contains(p.id) ? '参加' : '未参加',
+                                    style: TextStyle(color: presentIds.contains(p.id) ? Colors.green : Colors.grey),
+                                  ),
+                                  value: presentIds.contains(p.id),
+                                  onChanged: (val) {
+                                    _attendanceRepository.setPresent(
+                                      weekId: week.id,
+                                      playerId: p.id,
+                                      present: val,
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.person_add),
+                      label: const Text('本日のゲストを追加'),
+                      onPressed: () => _addGuest(week),
+                    ),
+                    const SizedBox(height: 8),
+                    StreamBuilder<List<Guest>>(
+                      stream: _guestRepository.watchAll(week.id),
+                      builder: (context, guestSnap) {
+                        final guests = guestSnap.data ?? [];
+                        if (guests.isEmpty) return const SizedBox.shrink();
+                        return Card(
+                          child: Column(
+                            children: [
+                              for (final g in guests)
+                                ListTile(
+                                  leading: const Icon(Icons.person_outline),
+                                  title: Text(g.name),
+                                  subtitle: Text('レーティング: ${g.rating.toStringAsFixed(2)}'),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    onPressed: () => _guestRepository.remove(weekId: week.id, guestId: g.id),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                  const Divider(height: 32),
+                  const Text('メンバー管理（仮レーティング設定）', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Column(
+                      children: [
+                        for (final p in players)
+                          ListTile(
+                            title: Text(p.kanjiName),
+                            subtitle: Text(
+                              p.isProvisional
+                                  ? '仮レーティング: ${p.effectiveStats01.toStringAsFixed(2)}'
+                                  : 'レーティング: ${p.rating.toStringAsFixed(2)}',
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.edit),
+                              tooltip: 'レーティングを手入力',
+                              onPressed: () => _editManualRating(p),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 32),
+                  const Text('システム管理', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.password),
+                    label: const Text('管理者パスワードを変更'),
+                    onPressed: _changePassword,
+                  ),
+                  const SizedBox(height: 32),
                 ],
               );
             },
-          ),
-          const Divider(height: 32),
-          const Text('ゲスト追加', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          StreamBuilder<Week?>(
-            stream: _weekRepository.watchCurrentWeek(),
-            builder: (context, snap) {
-              final week = snap.data;
-              if (week == null) {
-                return const Text('今週の試合予定がまだ登録されていません。');
-              }
-              return FilledButton.icon(
-                icon: const Icon(Icons.person_add),
-                label: const Text('今週のゲストを追加'),
-                onPressed: () => _addGuest(week),
-              );
-            },
-          ),
-          const Divider(height: 32),
-          const Text('パスワード変更', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.password),
-            label: const Text('管理者パスワードを変更'),
-            onPressed: _changePassword,
-          ),
-        ],
+          );
+        },
       ),
     );
   }
