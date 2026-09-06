@@ -41,7 +41,7 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('はじめまして')),
+      appBar: AppBar(title: const Text('ハイブグローバルリーグ')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -58,7 +58,7 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  const Text('お名前（漢字フルネーム）を入力してください。'),
+                  const Text('お名前（漢字フルネーム）を入力してください。\n※氏名は、リーグの成績ページと同じ表記で入力してください（苗字と名前の間に全角スペースを入れる）。例：今北　俺'),
                   const SizedBox(height: 24),
                   TextFormField(
                     controller: _nameController,
