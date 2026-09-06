@@ -1,4 +1,4 @@
-// [修正] アバター削除と表示名（displayName）の随時変更機能の実装 (v.1.4)
+// [修正] オーダー生成後は一般ユーザーの不参加変更をブロックする機能を追加 (v.1.5)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +7,7 @@ import '../models/player.dart';
 import '../models/week.dart';
 import '../services/app_state.dart';
 import '../services/repositories/attendance_repository.dart';
+import '../services/repositories/game_repository.dart';
 import '../services/repositories/player_repository.dart';
 import '../services/repositories/week_repository.dart';
 import '../widgets/match_info_card.dart';
@@ -25,6 +26,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
   final _weekRepository = WeekRepository();
   final _playerRepository = PlayerRepository();
   final _attendanceRepository = AttendanceRepository();
+  final _gameRepository = GameRepository(); // 追加
 
   Future<void> _editDisplayName(Player player) async {
     final controller = TextEditingController(text: player.effectiveName);
@@ -155,6 +157,19 @@ class _MyPageScreenState extends State<MyPageScreen> {
                               Expanded(
                                 child: ElevatedButton.icon(
                                   onPressed: () async {
+                                    // 不参加に変更しようとしている場合、オーダーが存在するかチェック
+                                    if (isPresent) {
+                                      final games = await _gameRepository.getAllOnce(week.id);
+                                      if (games.isNotEmpty) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('既にオーダーが生成されているため、不参加への変更は管理者に依頼してください')),
+                                          );
+                                        }
+                                        return;
+                                      }
+                                    }
+
                                     final newState = !isPresent;
                                     await _attendanceRepository.setPresent(
                                       weekId: week.id,

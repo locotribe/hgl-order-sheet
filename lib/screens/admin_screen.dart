@@ -1,14 +1,18 @@
-// [修正] 管理者機能（メンバーの出欠手動切り替え追加） (v.1.2)
+// [修正] 管理者が不参加にした際、未決着ゲームの枠を自動で空にする処理を追加 (v.1.3)
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../models/guest.dart';
 import '../models/player.dart';
 import '../models/week.dart';
 import '../models/attendance.dart';
+import '../services/app_state.dart';
 import '../services/repositories/config_repository.dart';
 import '../services/repositories/guest_repository.dart';
 import '../services/repositories/player_repository.dart';
 import '../services/repositories/week_repository.dart';
 import '../services/repositories/attendance_repository.dart';
+import '../services/repositories/game_repository.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -23,6 +27,7 @@ class _AdminScreenState extends State<AdminScreen> {
   final _weekRepository = WeekRepository();
   final _configRepository = ConfigRepository();
   final _attendanceRepository = AttendanceRepository();
+  final _gameRepository = GameRepository(); // 追加
 
   Future<void> _editManualRating(Player player) async {
     final controller = TextEditingController(
@@ -160,6 +165,9 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 自身のIDを取得（オーダー修正履歴の editedBy として使用）
+    final myId = context.watch<AppState>().currentPlayer!.id;
+
     return Scaffold(
       appBar: AppBar(title: const Text('管理者メニュー')),
       body: StreamBuilder<Week?>(
@@ -197,12 +205,20 @@ class _AdminScreenState extends State<AdminScreen> {
                                     style: TextStyle(color: presentIds.contains(p.id) ? Colors.green : Colors.grey),
                                   ),
                                   value: presentIds.contains(p.id),
-                                  onChanged: (val) {
-                                    _attendanceRepository.setPresent(
+                                  onChanged: (val) async {
+                                    await _attendanceRepository.setPresent(
                                       weekId: week.id,
                                       playerId: p.id,
                                       present: val,
                                     );
+                                    // 未参加に変更された場合、未決着のゲームからのみ枠を空にする
+                                    if (!val) {
+                                      await _gameRepository.removePlayerFromPendingGames(
+                                        weekId: week.id,
+                                        playerId: p.id,
+                                        editedBy: myId,
+                                      );
+                                    }
                                   },
                                 ),
                             ],
@@ -244,7 +260,6 @@ class _AdminScreenState extends State<AdminScreen> {
                   const Divider(height: 32),
                   const Text('メンバー管理（仮レーティング設定）', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
-// [修正] メンバー管理画面のプレイヤー名表示に displayName の括弧書きを追加 (v.1.5)
                   Card(
                     child: Column(
                       children: [

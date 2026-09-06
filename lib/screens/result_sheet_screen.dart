@@ -1,4 +1,4 @@
-// [修正] リザルトシートの出場回数サマリーからアイコンを削除 (v.1.5.3)
+// [修正] リザルトシートの勝敗入力UIを左右配置に変更し省スペース化 (v.1.5.4)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -249,7 +249,7 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
                                   textAlign: TextAlign.center,
                                 ),
                               ),
-                              // 参加者の出場回数一覧サマリーカード（アイコン削除）
+                              // 参加者の出場回数一覧サマリーカード
                               if (roster.isNotEmpty)
                                 Card(
                                   margin: const EdgeInsets.all(8),
@@ -485,94 +485,129 @@ class _GameRow extends StatelessWidget {
               ),
             ),
           ),
-          // 3. Body (First Throw + Players)
-          Row(
-            children: [
-              // Left: 先攻 / 後攻
-              SizedBox(
-                width: 64,
-                child: Center(
-                  child: Text(
-                    _firstThrowLabel,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: game.firstThrow == FirstThrow.undecided
-                          ? Colors.grey
-                          : (game.firstThrow == FirstThrow.first
-                          ? Colors.red.shade700
-                          : Colors.blue.shade700),
+          // 3. Body (Left: Buttons+Throw, Center: Players, Right: Result Display)
+          IntrinsicHeight(
+            child: Container(
+              // シングルスでもボタンが押しやすい高さを確保
+              constraints: const BoxConstraints(minHeight: 88),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 左側: 勝敗入力ボタンと先攻後攻表示
+                  SizedBox(
+                    width: 64,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _SideResultButton(
+                            label: '◯',
+                            color: Colors.green,
+                            selected: game.result == GameResult.win,
+                            onTap: () => onTapResult(GameResult.win),
+                          ),
+                        ),
+                        Container(
+                          color: Colors.grey.shade100,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            _firstThrowLabel,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: game.firstThrow == FirstThrow.undecided
+                                  ? Colors.grey.shade600
+                                  : (game.firstThrow == FirstThrow.first
+                                  ? Colors.red.shade700
+                                  : Colors.blue.shade700),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: _SideResultButton(
+                            label: '✕',
+                            color: Colors.red,
+                            selected: game.result == GameResult.loss,
+                            onTap: () => onTapResult(GameResult.loss),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ),
-              // Divider
-              Container(width: 1, color: Colors.grey.shade300),
-              // Center: プレイヤーリスト
-              Expanded(
-                child: Column(
-                  children: List.generate(slotCount, (i) {
-                    final id =
-                    game.assigned.length > i ? game.assigned[i] : null;
-                    final name = id == null || id.isEmpty
-                        ? '（タップして追加）'
-                        : (idToName[id] ?? '(不明)');
-                    final isGuest = id != null && (isGuestId[id] ?? false);
+                  // 左側の区切り線
+                  Container(width: 1, color: Colors.grey.shade300),
+                  // 中央: プレイヤーリスト
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(slotCount, (i) {
+                        final id =
+                        game.assigned.length > i ? game.assigned[i] : null;
+                        final name = id == null || id.isEmpty
+                            ? '（タップして追加）'
+                            : (idToName[id] ?? '(不明)');
+                        final isGuest = id != null && (isGuestId[id] ?? false);
 
-                    return InkWell(
-                      onTap: () => onTapSlot(i),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 14, horizontal: 16),
-                        decoration: BoxDecoration(
-                          border: i < slotCount - 1
-                              ? Border(
-                              bottom:
-                              BorderSide(color: Colors.grey.shade200))
-                              : null,
-                          color: isGuest
-                              ? Colors.amber.withValues(alpha: 0.1)
-                              : null,
-                        ),
+                        return InkWell(
+                          onTap: () => onTapSlot(i),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 14, horizontal: 16),
+                            decoration: BoxDecoration(
+                              border: i < slotCount - 1
+                                  ? Border(
+                                  bottom: BorderSide(
+                                      color: Colors.grey.shade200))
+                                  : null,
+                              color: isGuest
+                                  ? Colors.amber.withValues(alpha: 0.1)
+                                  : null,
+                            ),
+                            child: Text(
+                              isGuest ? '$name (ゲスト)' : name,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: id == null || id.isEmpty
+                                    ? Colors.grey
+                                    : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                  // 右側の区切り線
+                  Container(width: 1, color: Colors.grey.shade300),
+                  // 右側: 勝敗の大きな表示
+                  SizedBox(
+                    width: 72,
+                    child: Container(
+                      color: game.result == GameResult.win
+                          ? Colors.green.withValues(alpha: 0.05)
+                          : (game.result == GameResult.loss
+                          ? Colors.red.withValues(alpha: 0.05)
+                          : Colors.transparent),
+                      child: Center(
                         child: Text(
-                          isGuest ? '$name (ゲスト)' : name,
+                          game.result == GameResult.win
+                              ? '◯'
+                              : (game.result == GameResult.loss ? '✕' : ''),
                           style: TextStyle(
-                            fontSize: 16,
-                            color: id == null || id.isEmpty ? Colors.grey : Colors.black87,
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: game.result == GameResult.win
+                                ? Colors.green
+                                : Colors.red,
                           ),
                         ),
                       ),
-                    );
-                  }),
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const Divider(height: 1, thickness: 1),
-          // 4. Bottom: Win/Loss Buttons
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _ResultPanelButton(
-                    label: '◯',
-                    color: Colors.green,
-                    selected: game.result == GameResult.win,
-                    onTap: () => onTapResult(GameResult.win),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _ResultPanelButton(
-                    label: '✕',
-                    color: Colors.red,
-                    selected: game.result == GameResult.loss,
-                    onTap: () => onTapResult(GameResult.loss),
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -581,8 +616,8 @@ class _GameRow extends StatelessWidget {
   }
 }
 
-class _ResultPanelButton extends StatelessWidget {
-  const _ResultPanelButton({
+class _SideResultButton extends StatelessWidget {
+  const _SideResultButton({
     required this.label,
     required this.color,
     required this.selected,
@@ -596,26 +631,18 @@ class _ResultPanelButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: selected ? color.withValues(alpha: 0.15) : Colors.grey.shade50,
-          border: Border.all(
-            color: selected ? color : Colors.grey.shade300,
-            width: selected ? 2 : 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: selected ? color : Colors.grey.shade400,
+    return Material(
+      color: selected ? color.withValues(alpha: 0.15) : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: selected ? color : Colors.grey.shade300,
+            ),
           ),
         ),
       ),
