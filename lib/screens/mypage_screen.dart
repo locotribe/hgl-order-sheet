@@ -1,7 +1,8 @@
-// [修正] マイページの今週の試合UIに共通対戦カードを適用 (v.1.1)
+// [修正] トグル式出欠ボタンとオーダーシート表記の変更 (v.1.2)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/attendance.dart';
 import '../models/player.dart';
 import '../models/week.dart';
 import '../services/app_state.dart';
@@ -75,53 +76,72 @@ class _MyPageScreenState extends State<MyPageScreen> {
                       ),
                     );
                   }
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      MatchInfoCard(week: week),
-                      const SizedBox(height: 12),
-                      Row(
+
+                  // 自分自身の出欠状況をリアルタイム購読
+                  return StreamBuilder<List<Attendance>>(
+                    stream: _attendanceRepository.watchAll(week.id),
+                    builder: (context, attSnap) {
+                      final attendanceList = attSnap.data ?? [];
+                      // 自分の参加状態を取得
+                      final myAttendance = attendanceList.where((a) => a.playerId == myId).firstOrNull;
+                      final isPresent = myAttendance?.present ?? false;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: () async {
-                                await _attendanceRepository.setPresent(
-                                  weekId: week.id,
-                                  playerId: myId,
-                                  present: true,
-                                );
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('参加を記録しました')),
-                                  );
-                                }
-                              },
-                              icon: const Icon(Icons.check_circle_outline),
-                              label: const Text('参加する'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (_) => const AttendanceScreen()),
-                                );
-                              },
-                              icon: const Icon(Icons.group),
-                              label: const Text('出席状況を見る'),
-                            ),
+                          MatchInfoCard(week: week),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    // トグル処理（参加↔不参加を切り替え）
+                                    final newState = !isPresent;
+                                    await _attendanceRepository.setPresent(
+                                      weekId: week.id,
+                                      playerId: myId,
+                                      present: newState,
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(newState ? '参加を記録しました' : '参加を取り消しました')),
+                                      );
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    // 参加中なら赤、未参加なら白（標準）
+                                    backgroundColor: isPresent ? Colors.red.shade600 : null,
+                                    foregroundColor: isPresent ? Colors.white : null,
+                                  ),
+                                  icon: Icon(isPresent ? Icons.check_circle : Icons.check_circle_outline),
+                                  label: Text(isPresent ? '参加中' : '参加する'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(builder: (_) => const AttendanceScreen()),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.group),
+                                  label: const Text('出席状況を見る'),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
+                      );
+                    },
                   );
                 },
               ),
               const SizedBox(height: 24),
               OutlinedButton.icon(
                 icon: const Icon(Icons.list_alt),
-                label: const Text('リザルトシートを見る'),
+                label: const Text('オーダーシートを見る'),
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ResultSheetScreen()),
