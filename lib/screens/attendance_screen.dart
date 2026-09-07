@@ -1,4 +1,4 @@
-// [修正] 出席確認ページの参加者一覧で変更された名前を単純に表示するよう修正 (v.1.3)
+// [修正] 試合当日の21:00以降はオーダーの自動生成ボタンを無効化し、注意書きを追加 (v.1.9.3)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -37,12 +37,34 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   bool _generating = false;
 
+  /// 試合当日の21:00以降かどうかを判定する
+  bool _isGenerationExpired(Week week) {
+    final now = DateTime.now();
+    // 試合日と今日が同じ年月日かチェック
+    final isSameDay = now.year == week.date.year &&
+        now.month == week.date.month &&
+        now.day == week.date.day;
+
+    if (!isSameDay) return false;
+
+    // 当日の21:00（21時0分）以降かどうか
+    return now.hour >= 21;
+  }
+
   Future<void> _generateOrder(
       Week week,
       List<Player> players,
       List<Attendance> attendance,
       List<Guest> guests,
       ) async {
+    // 万が一21時以降に実行された場合のガード
+    if (_isGenerationExpired(week)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('試合中（21:00以降）のため、自動生成はできません')),
+      );
+      return;
+    }
+
     final validPresentIds = attendance
         .where((a) {
       if (!a.present) return false;
@@ -141,6 +163,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           if (week == null) {
             return const Center(child: Text('今週の試合情報がありません'));
           }
+
+          final isExpired = _isGenerationExpired(week);
 
           return StreamBuilder<List<Player>>(
             stream: _playerRepository.watchAll(),
@@ -269,7 +293,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             )
                                 : const Icon(Icons.auto_awesome),
                             label: const Text('オーダーを自動生成する', style: TextStyle(fontWeight: FontWeight.bold)),
-                            onPressed: _generating
+                            onPressed: (_generating || isExpired)
                                 ? null
                                 : () => _generateOrder(
                               week,
@@ -278,6 +302,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                               guests,
                             ),
                           ),
+                          if (isExpired) ...[
+                            const SizedBox(height: 6),
+                            const Text(
+                              '※試合中のため自動生成できません',
+                              style: TextStyle(color: Colors.red, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                           const SizedBox(height: 24),
                         ],
                       );
