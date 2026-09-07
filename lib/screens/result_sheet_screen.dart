@@ -1,4 +1,4 @@
-// [修正] リザルトシート左側の勝敗ボタンの背景ハイライトを削除 (v.1.5.5)
+// [修正] リザルトシート手動入れ替え時に同一ゲーム内で重複しているプレイヤーを選択不可にする excludedIds を適用 (v1.9.5)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -62,6 +62,13 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
         ? game.assigned[slotIndex]
         : null;
 
+    final excludedIds = <String>{};
+    for (var i = 0; i < game.assigned.length; i++) {
+      if (i != slotIndex && game.assigned[i].isNotEmpty) {
+        excludedIds.add(game.assigned[i]);
+      }
+    }
+
     final selected = await showPlayerPickerSheet(
       context: context,
       roster: roster,
@@ -69,6 +76,7 @@ class _ResultSheetScreenState extends State<ResultSheetScreen> {
       cap: def.perPlayerCap,
       counts: counts,
       currentOccupantId: currentOccupant,
+      excludedIds: excludedIds,
     );
 
     if (selected == null || selected == currentOccupant) return;
@@ -631,7 +639,7 @@ class _SideResultButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent, // 背景のハイライトを削除
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Center(

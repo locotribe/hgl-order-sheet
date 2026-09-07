@@ -1,3 +1,4 @@
+// [修正] 同一ゲーム内で重複しているプレイヤーを選択不可にする excludedIds を追加 (v1.9.5)
 import 'package:flutter/material.dart';
 
 import '../config/game_definitions.dart';
@@ -24,6 +25,7 @@ Future<String?> showPlayerPickerSheet({
   required int cap,
   required RosterCounts counts,
   required String? currentOccupantId,
+  Set<String> excludedIds = const {},
 }) {
   final letter = formatShortLetter(format);
   return showModalBottomSheet<String>(
@@ -45,10 +47,11 @@ Future<String?> showPlayerPickerSheet({
               Builder(
                 builder: (context) {
                   final isCurrent = entrant.id == currentOccupantId;
+                  final isExcluded = excludedIds.contains(entrant.id);
                   final used =
                       counts.countFor(format, entrant.id) - (isCurrent ? 1 : 0);
                   final remaining = cap - used;
-                  final disabled = remaining <= 0 && !isCurrent;
+                  final disabled = (remaining <= 0 && !isCurrent) || isExcluded;
                   final displayRemaining = remaining < 0 ? 0 : remaining;
                   return ListTile(
                     enabled: !disabled,
@@ -60,7 +63,7 @@ Future<String?> showPlayerPickerSheet({
                         : null,
                     title: Text(
                       '残$letter$displayRemaining ${entrant.name}'
-                      '${entrant.isGuest ? "（ゲスト）" : ""}',
+                          '${entrant.isGuest ? "（ゲスト）" : ""}',
                       style: TextStyle(color: disabled ? Colors.grey : null),
                     ),
                     onTap: disabled
