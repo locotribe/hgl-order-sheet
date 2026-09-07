@@ -1,4 +1,4 @@
-// [修正] Web環境でクラッシュする dart:io の Platform 判定を foundation の defaultTargetPlatform に置き換え (v.1.8)
+// [修正] UIの並び順変更と整理、成績スタッツ専用ページへの入り口を追加 (v1.9.6)
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +16,7 @@ import '../services/repositories/week_repository.dart';
 import '../widgets/match_info_card.dart';
 import 'admin_gate_screen.dart';
 import 'attendance_screen.dart';
+import 'performance_stats_screen.dart';
 import 'result_sheet_screen.dart';
 
 class MyPageScreen extends StatefulWidget {
@@ -63,7 +64,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
     }
   }
 
-  // [修正] Web環境（LIFF等）でもクラッシュせずにOSを判定・起動するロジックに変更 (v.1.8)
   Future<void> _launchAppOrStore() async {
     final appUrl = Uri.parse('dlsports://');
     final isAndroid = defaultTargetPlatform == TargetPlatform.android;
@@ -274,156 +274,138 @@ class _MyPageScreenState extends State<MyPageScreen> {
         initialData: appState.currentPlayer,
         builder: (context, playerSnap) {
           final player = playerSnap.data ?? appState.currentPlayer!;
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _ProfileCard(
-                player: player,
-                onEditName: () => _editDisplayName(player),
-              ),
-              const SizedBox(height: 16),
-              _StatsCard(player: player),
-              const SizedBox(height: 16),
-              StreamBuilder<List<Player>>(
-                stream: _playerRepository.watchAll(),
-                builder: (context, allSnap) {
-                  final all = allSnap.data;
-                  if (all == null || all.isEmpty) return const SizedBox.shrink();
-                  final ranked = [...all]
-                    ..sort((a, b) => b.winRate.compareTo(a.winRate));
-                  final rank = ranked.indexWhere((p) => p.id == player.id) + 1;
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text('チーム内ランキング : $rank 位 / ${ranked.length}人'),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-              const Text('今週の試合', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 8),
-              StreamBuilder<Week?>(
-                stream: _weekRepository.watchCurrentWeek(),
-                builder: (context, weekSnap) {
-                  final week = weekSnap.data;
-                  if (week == null) {
-                    return const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('今週の試合情報がありません'),
-                      ),
-                    );
-                  }
 
-                  return StreamBuilder<List<Attendance>>(
-                    stream: _attendanceRepository.watchAll(week.id),
-                    builder: (context, attSnap) {
-                      final attendanceList = attSnap.data ?? [];
-                      final myAttendance = attendanceList.where((a) => a.playerId == myId).firstOrNull;
-                      final isPresent = myAttendance?.present ?? false;
+          return StreamBuilder<Week?>(
+            stream: _weekRepository.watchCurrentWeek(),
+            builder: (context, weekSnap) {
+              final week = weekSnap.data;
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          MatchInfoCard(week: week),
-                          const SizedBox(height: 8),
+              return StreamBuilder<List<Attendance>>(
+                stream: week != null ? _attendanceRepository.watchAll(week.id) : const Stream.empty(),
+                builder: (context, attSnap) {
+                  final attendanceList = attSnap.data ?? [];
+                  final myAttendance = attendanceList.where((a) => a.playerId == myId).firstOrNull;
+                  final isPresent = myAttendance?.present ?? false;
 
-                          InkWell(
-                            onTap: () => _launchWeb('https://dartshive.com/league/'),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text(
-                                'ハイブグローバルリーグ公式ページ',
-                                style: TextStyle(
-                                  color: Colors.blue,
-                                  decoration: TextDecoration.underline,
-                                  fontWeight: FontWeight.bold,
+                  return ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      // 1. 今週の試合カード または 情報なしメッセージ
+                      if (week == null)
+                        const Card(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('今週の試合情報がありません'),
+                          ),
+                        )
+                      else ...[
+                        MatchInfoCard(week: week),
+                        const SizedBox(height: 16),
+
+                        // 2. 参加・出欠状況ボタン群
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _handleAttendanceToggle(
+                                  week: week,
+                                  myId: myId,
+                                  isPresent: isPresent,
                                 ),
-                                textAlign: TextAlign.center,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isPresent ? Colors.red.shade600 : null,
+                                  foregroundColor: isPresent ? Colors.white : null,
+                                ),
+                                icon: Icon(isPresent ? Icons.check_circle : Icons.check_circle_outline),
+                                label: Text(isPresent ? '参加中' : '参加する'),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          // [修正] ダーツライブスポーツアプリのリンクを大きなアイコンのみに変更 (v.1.8.1)
-                          InkWell(
-                            onTap: _launchAppOrStore,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Image.asset(
-                                      'assets/image_f6d8df.png',
-                                      width: 48,
-                                      height: 48,
-                                      errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.sports_esports, size: 48),
-                                    ),
-                                  ),
-                                ],
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const AttendanceScreen()),
+                                  );
+                                },
+                                icon: const Icon(Icons.group),
+                                label: const Text('出席状況'),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            '※詳しいデータは専用アプリから確認してください。',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 3. オーダーシートを見るボタン
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.list_alt),
+                          label: const Text('オーダーシートを見る'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const ResultSheetScreen()),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      // 4. 自分の名前変更＆スタッツ表示カード
+                      _ProfileCard(
+                        player: player,
+                        onEditName: () => _editDisplayName(player),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // 5. 公式リンクとアプリ誘導
+                      InkWell(
+                        onTap: () => _launchWeb('https://dartshive.com/league/'),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            'ハイブグローバルリーグ公式ページ',
+                            style: TextStyle(
+                              color: Colors.blue,
+                              decoration: TextDecoration.underline,
+                              fontWeight: FontWeight.bold,
+                            ),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 16),
-
-                          Row(
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      InkWell(
+                        onTap: _launchAppOrStore,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: () => _handleAttendanceToggle(
-                                    week: week,
-                                    myId: myId,
-                                    isPresent: isPresent,
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: isPresent ? Colors.red.shade600 : null,
-                                    foregroundColor: isPresent ? Colors.white : null,
-                                  ),
-                                  icon: Icon(isPresent ? Icons.check_circle : Icons.check_circle_outline),
-                                  label: Text(isPresent ? '参加中' : '参加する'),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(builder: (_) => const AttendanceScreen()),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.group),
-                                  label: const Text('出席状況'),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.asset(
+                                  'assets/image_f6d8df.png',
+                                  width: 48,
+                                  height: 48,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(Icons.sports_esports, size: 48),
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      );
-                    },
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '※詳しいデータは専用アプリから確認してください。',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                   );
                 },
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.list_alt),
-                label: const Text('オーダーシートを見る'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ResultSheetScreen()),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-            ],
+              );
+            },
           );
         },
       ),
@@ -441,72 +423,37 @@ class _ProfileCard extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          player.effectiveName,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        tooltip: '表示名を変更',
-                        onPressed: onEditName,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text('リーグレーティング : ${player.rating.toStringAsFixed(2)}'),
-                  if (player.isProvisional)
-                    const Text(
-                      '※手入力の仮レーティング適用中',
-                      style: TextStyle(color: Colors.orange, fontSize: 12),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatsCard extends StatelessWidget {
-  const _StatsCard({required this.player});
-  final Player player;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('成績スタッツ', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('01 : ${player.effectiveStats01.toStringAsFixed(2)}'),
-                Text('クリケット : ${player.effectiveStatsCricket.toStringAsFixed(2)}'),
+                Expanded(
+                  child: Text(
+                    player.effectiveName,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  tooltip: '表示名を変更',
+                  onPressed: onEditName,
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('勝敗 : ${player.wins}勝 ${player.losses}敗'),
-                Text('勝率 : ${(player.winRate * 100).toStringAsFixed(1)}%'),
-              ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity, // ボタンを横幅いっぱいに広げる
+              child: FilledButton.icon(
+                icon: const Icon(Icons.bar_chart),
+                label: const Text('成績スタッツを見る'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PerformanceStatsScreen(),
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),

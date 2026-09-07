@@ -1,8 +1,10 @@
-// [修正] 氏名の入力ルール（全角文字限定、苗字と名前の間の全角スペース必須）のバリデーションを追加 (v.1.9.2)
+// [修正] アプリバーに管理者画面への隠し導線（5回タップ）を追加 (v1.9.6)
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/app_state.dart';
+import 'admin_gate_screen.dart';
 
 /// 初回のみ：漢字フルネームを入力してLINEユーザーIDと紐付ける（SPEC.md §4 画面1）。
 class NameEntryScreen extends StatefulWidget {
@@ -18,10 +20,30 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
   bool _submitting = false;
   String? _error;
 
+  int _adminTapCount = 0;
+  Timer? _adminTapTimer;
+
   @override
   void dispose() {
     _nameController.dispose();
+    _adminTapTimer?.cancel();
     super.dispose();
+  }
+
+  void _handleAdminTap() {
+    _adminTapTimer?.cancel();
+    _adminTapCount++;
+
+    if (_adminTapCount >= 5) {
+      _adminTapCount = 0;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AdminGateScreen()),
+      );
+    } else {
+      _adminTapTimer = Timer(const Duration(seconds: 1), () {
+        _adminTapCount = 0;
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -42,7 +64,12 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ハイブグローバルリーグ')),
+      appBar: AppBar(
+        title: GestureDetector(
+          onTap: _handleAdminTap,
+          child: const Text('ハイブグローバルリーグ'),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
