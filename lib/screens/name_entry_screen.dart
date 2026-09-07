@@ -1,3 +1,4 @@
+// [修正] 氏名の入力ルール（全角文字限定、苗字と名前の間の全角スペース必須）のバリデーションを追加 (v.1.9.2)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -58,7 +59,7 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  const Text('お名前（漢字フルネーム）を入力してください。\n※氏名は、リーグの成績ページと同じ表記で入力してください（苗字と名前の間に全角スペースを入れる）。例：今北　俺'),
+                  const Text('お名前（漢字フルネーム）を入力してください。\n※氏名は、リーグの成績ページと同じ表記で入力してください（苗字と名前の間に全角スペースを入れる）。例：今北 俺'),
                   const SizedBox(height: 24),
                   TextFormField(
                     controller: _nameController,
@@ -70,6 +71,23 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
                       if (value == null || value.trim().isEmpty) {
                         return '氏名を入力してください';
                       }
+
+                      // 1. 苗字と名前の間に全角スペースが含まれているかチェック
+                      if (!value.contains('\u3000')) {
+                        return '苗字と名前の間には全角スペースを入れてください（例：今北 俺）';
+                      }
+
+                      // 2. 半角スペースが含まれていないかチェック（念のため）
+                      if (value.contains(' ')) {
+                        return '半角スペースではなく全角スペースを使用してください';
+                      }
+
+                      // 3. 全角文字（漢字、ひらがな、カタカナ、全角スペース）以外の文字（半角英数・記号等）が含まれていないかチェック
+                      final invalidCharRegex = RegExp(r'[^\u3000-\u9FAF\u3040-\u309F\u30A0-\u30FF]');
+                      if (invalidCharRegex.hasMatch(value)) {
+                        return '漢字、ひらがな、カタカナ、および全角スペースのみで入力してください';
+                      }
+
                       return null;
                     },
                   ),
@@ -82,10 +100,10 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
                     onPressed: _submitting ? null : _submit,
                     child: _submitting
                         ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                         : const Text('登録する'),
                   ),
                 ],
