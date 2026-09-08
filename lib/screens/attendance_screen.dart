@@ -17,7 +17,6 @@ import '../services/repositories/guest_repository.dart';
 import '../services/repositories/player_repository.dart';
 import '../services/repositories/week_repository.dart';
 import '../widgets/match_info_card.dart';
-import 'admin_gate_screen.dart';
 import 'result_sheet_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -266,18 +265,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                               trailing: Text('${g.rating.toStringAsFixed(1)}', style: const TextStyle(color: Colors.black54)),
                             ),
                           const SizedBox(height: 32),
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.lock),
-                            label: const Text('ゲスト追加・メンバー管理（管理者）'),
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const AdminGateScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 12),
                           FilledButton.icon(
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
