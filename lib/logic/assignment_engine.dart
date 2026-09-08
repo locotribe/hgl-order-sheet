@@ -120,11 +120,6 @@ class AssignmentEngine {
     final assignments = <GameAssignment>[];
 
     for (final def in kGameDefinitions) {
-      // 第1ゲームはHOME先攻(強い人寄せ=1)、AWAY後攻(弱い人寄せ=-1)。以降は0(中立)
-      final leanSign = def.number == 1
-          ? (homeAway == HomeAway.home ? 1 : -1)
-          : 0;
-
       final capField = switch (def.format) {
         GameFormat.singles => singlesCount,
         GameFormat.doubles => doublesCount,
@@ -136,26 +131,35 @@ class AssignmentEngine {
           .where((e) => capField[e.id]! < def.perPlayerCap)
           .toList();
 
-      final scored = {for (final e in eligible) e.id: score(e, def, leanSign)};
-
       List<String> chosen;
 
-      if (def.format == GameFormat.doubles) {
-        chosen = _pickPair(
-          eligible: eligible,
-          scored: scored,
-          pairCount: pairCount,
-          bestEffort: bestEffort,
-        ) ?? [];
-        if (chosen.length < 2 && !bestEffort) return null;
+      if (def.number == 1) {
+        // 第1ゲーム専用の選出（HOME: 低3人 / AWAY: 低2人 + 中央値1人）
+        chosen = _pickGame1(
+          entrants: eligible,
+          homeAway: homeAway,
+        );
       } else {
-        final needed = def.format.playerCount;
-        if (eligible.length < needed && !bestEffort) return null;
+        const leanSign = 0; // 第2ゲーム以降は中立
+        final scored = {for (final e in eligible) e.id: score(e, def, leanSign)};
 
-        final sortedIds = [...eligible.map((e) => e.id)]
-          ..sort((a, b) => scored[b]!.compareTo(scored[a]!));
+        if (def.format == GameFormat.doubles) {
+          chosen = _pickPair(
+            eligible: eligible,
+            scored: scored,
+            pairCount: pairCount,
+            bestEffort: bestEffort,
+          ) ?? [];
+          if (chosen.length < 2 && !bestEffort) return null;
+        } else {
+          final needed = def.format.playerCount;
+          if (eligible.length < needed && !bestEffort) return null;
 
-        chosen = sortedIds.take(needed).toList();
+          final sortedIds = [...eligible.map((e) => e.id)]
+            ..sort((a, b) => scored[b]!.compareTo(scored[a]!));
+
+          chosen = sortedIds.take(needed).toList();
+        }
       }
 
       // カウントの更新
@@ -225,5 +229,57 @@ class AssignmentEngine {
     pairCount[key] = (pairCount[key] ?? 0) + 1;
 
     return bestPair.map((e) => e.id).toList();
+  }
+
+  /// 第1ゲーム (901 トリオス オートハンデ) 専用の選出ロジック
+  List<String> _pickGame1({
+    required List<AssignmentEntrant> entrants,
+    required HomeAway homeAway,
+  }) {
+    if (entrants.length <= 3) {
+      return entrants.map((e) => e.id).toList();
+    }
+
+    // stats01 が低い順（昇順）にソート
+    final sortedByStats = [...entrants]
+      ..sort((a, b) => a.stats01.compareTo(b.stats01));
+
+    if (homeAway == HomeAway.home) {
+      // HOME (先攻): ハンデ最大化 -> stats01 が最も低い3人を選出
+      return sortedByStats.take(3).map((e) => e.id).toList();
+    } else {
+      // AWAY (後攻): 相手ハンデ抑制 + 決定力保持
+      // ① 最も stats01 が低い2人を抽出
+      final low1 = sortedByStats[0];
+      final low2 = sortedByStats[1];
+
+      // ② 残りの候補者（3人目以降）
+      final remaining = sortedByStats.sublist(2);
+
+      // ③ チーム全体の stats01 中央値 (Median) を算出
+      final statsList = entrants.map((e) => e.stats01).toList()..sort();
+      final double median = _calculateMedian(statsList);
+
+      // ④ 残りメンバーの中から |stats01 - median| (中央値との差) が最も小さい選手を選出
+      remaining.sort((a, b) {
+        final diffA = (a.stats01 - median).abs();
+        final diffB = (b.stats01 - median).abs();
+        return diffA.compareTo(diffB);
+      });
+
+      final mid1 = remaining[0];
+
+      return [low1.id, low2.id, mid1.id];
+    }
+  }
+
+  /// 中央値（Median）を計算するヘルパー関数
+  double _calculateMedian(List<double> sortedList) {
+    final count = sortedList.length;
+    if (count % 2 == 1) {
+      return sortedList[count ~/ 2];
+    } else {
+      return (sortedList[(count ~/ 2) - 1] + sortedList[count ~/ 2]) / 2.0;
+    }
   }
 }

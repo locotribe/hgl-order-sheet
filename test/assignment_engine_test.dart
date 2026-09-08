@@ -158,4 +158,30 @@ void main() {
       _assertNoRuleViolations(entrants, result);
     }
   });
+
+  test('第1ゲーム(Trios 01)の選出ルール検証 (HOME: 低3人, AWAY: 低2人+中央値1人)', () {
+    final entrants = [
+      const AssignmentEntrant(id: 'p1', name: 'P1', stats01: 10.0, statsCricket: 1.0), // 低1
+      const AssignmentEntrant(id: 'p2', name: 'P2', stats01: 15.0, statsCricket: 2.0), // 低2
+      const AssignmentEntrant(id: 'p3', name: 'P3', stats01: 30.0, statsCricket: 3.0), // 中央値 (30.0)
+      const AssignmentEntrant(id: 'p4', name: 'P4', stats01: 45.0, statsCricket: 4.0),
+      const AssignmentEntrant(id: 'p5', name: 'P5', stats01: 50.0, statsCricket: 5.0),
+    ];
+
+    // HOME (先攻): stats01 が最も低い3人 (p1, p2, p3)
+    final homeResult = engine.generate(
+      entrants: entrants,
+      homeAway: HomeAway.home,
+    );
+    final homeAssigned = homeResult.assignments.first.assignedIds;
+    expect(homeAssigned.toSet(), equals({'p1', 'p2', 'p3'}));
+
+    // AWAY (後攻): 低い2人 (p1, p2) + 中央値30.0に一番近い1人 (p3)
+    final awayResult = engine.generate(
+      entrants: entrants,
+      homeAway: HomeAway.away,
+    );
+    final awayAssigned = awayResult.assignments.first.assignedIds;
+    expect(awayAssigned.toSet(), equals({'p1', 'p2', 'p3'}));
+  });
 }
