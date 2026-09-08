@@ -1,4 +1,5 @@
-// [追加] 成績スタッツ専用ページ (v1.9.6)
+// [修正] 成績スタッツ専用ページ (v1.9.7)
+// - ゲーム形式別 → type × format ごとに勝敗付きで表示
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -18,15 +19,14 @@ class _PerformanceStatsScreenState extends State<PerformanceStatsScreen> {
   final _playerRepository = PlayerRepository();
   final _calculator = HistoricalStatsCalculator();
 
-  late Future<Map<String, int>> _countsFuture;
+  late Future<List<GameTypeStats>> _statsFuture;
   late String _myId;
 
   @override
   void initState() {
     super.initState();
-    // 画面初期化時に一度だけ集計ロジックを呼び出してFutureを保持する
     _myId = context.read<AppState>().currentPlayer!.id;
-    _countsFuture = _calculator.getPlayerGameCounts(_myId);
+    _statsFuture = _calculator.getPlayerGameTypeStats(_myId);
   }
 
   @override
@@ -47,7 +47,7 @@ class _PerformanceStatsScreenState extends State<PerformanceStatsScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // 1. リーグレーティング表示（大きめのフォント）
+              // 1. リーグレーティング表示
               Card(
                 elevation: 4,
                 color: Theme.of(context).colorScheme.primaryContainer,
@@ -146,7 +146,7 @@ class _PerformanceStatsScreenState extends State<PerformanceStatsScreen> {
               ),
               const SizedBox(height: 16),
 
-              // 4. これまでに出場したゲームの種類と回数（Firestoreから集計）
+              // 4. ゲーム別（type × format）出場回数 + 勝敗
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -154,12 +154,12 @@ class _PerformanceStatsScreenState extends State<PerformanceStatsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'ゲーム形式別の累計出場回数',
+                        'ゲーム別の累計出場回数と勝敗',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
                       ),
                       const Divider(),
-                      FutureBuilder<Map<String, int>>(
-                        future: _countsFuture,
+                      FutureBuilder<List<GameTypeStats>>(
+                        future: _statsFuture,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) {
                             return const Padding(
@@ -174,9 +174,8 @@ class _PerformanceStatsScreenState extends State<PerformanceStatsScreen> {
                             );
                           }
 
-                          final counts = snapshot.data ?? {};
-                          // 1回も出場していない場合はメッセージを表示
-                          if (counts.isEmpty || counts.values.every((v) => v == 0)) {
+                          final stats = snapshot.data ?? [];
+                          if (stats.isEmpty) {
                             return const Padding(
                               padding: EdgeInsets.symmetric(vertical: 24),
                               child: Center(
@@ -185,19 +184,19 @@ class _PerformanceStatsScreenState extends State<PerformanceStatsScreen> {
                             );
                           }
 
-                          // 降順（出場回数が多い順）に並べ替えてリスト表示
-                          final sortedEntries = counts.entries.where((e) => e.value > 0).toList()
-                            ..sort((a, b) => b.value.compareTo(a.value));
-
                           return Column(
-                            children: sortedEntries.map((e) => ListTile(
+                            children: stats.map((s) => ListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                               title: Text(
-                                HistoricalStatsCalculator.formatLabel(e.key),
+                                '${s.type} (${HistoricalStatsCalculator.formatLabel(s.format)})',
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
+                              subtitle: Text(
+                                '${s.wins}勝 ${s.losses}敗',
+                                style: const TextStyle(fontSize: 13, color: Colors.grey),
+                              ),
                               trailing: Text(
-                                '${e.value} 回',
+                                '${s.total} 回',
                                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                               ),
                             )).toList(),
